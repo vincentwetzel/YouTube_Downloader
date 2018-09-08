@@ -26,12 +26,13 @@ class NotYoutube(Exception):
         super().__init__(message)
 
 def main():
+    # TODO: Install all this stuff so it can run natively, outside of venv
+
     print("Opening cmd to download...")
     shell = win32com.client.Dispatch("WScript.Shell")
-    shell.Run("cmd.exe")
-    shell.AppActivate("cmd.exe")
-    win32api.Sleep(100)  # need this or else the SendKeys freaks out
 
+
+    # Dump clipboard data into a variable
     win32clipboard.OpenClipboard()
     # clipboard_as_encoded_bytes = (win32clipboard.GetClipboardData(win32con.CF_TEXT))
     clipboard_as_string = (win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
@@ -40,7 +41,10 @@ def main():
         raise NotYoutube("The value on the clipboard is not a YouTube URL.")
     win32clipboard.CloseClipboard()
 
-    # clipboard = "https://www.youtube.com/watch?v=u7bfD7GqgtU"  # TODO: Make this the actual clipboard data
+    # Open cmd and starts a new youtube-dl download
+    shell.Run("cmd.exe")
+    shell.AppActivate("cmd.exe")
+    win32api.Sleep(100)  # need this or else the SendKeys freaks out
     shell.SendKeys("cd /d C:\\Users\\vince{Enter}")
     shell.SendKeys("youtube-dl " + clipboard_as_string + " && exit")
     shell.SendKeys("{Enter}")
