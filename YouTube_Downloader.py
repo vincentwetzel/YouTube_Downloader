@@ -54,8 +54,8 @@ def run_youtube_dl_cmd(cmd):
     result = []
     process = subprocess.Popen(cmd,
                                shell=True,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE
+                               # stdout=subprocess.PIPE, # Prevents output from showing in CMD window.
+                               # stderr=subprocess.PIPE  # Prevents output from showing in CMD window.
                                )
 
     output, error = process.communicate()  # Prevents cout and cerr from locking up cmd.
