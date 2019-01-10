@@ -1,63 +1,86 @@
-import win32com.client
-import win32ui
-import win32api
-import win32gui
-import win32con
 import win32clipboard
+import win32com
+import subprocess
+import win32con
+import win32com.client
+import os
+import shutil
 
-'''
-def window_enum_handler(hwnd, resultList):
-    if win32gui.IsWindowVisible(hwnd) and win32gui.GetWindowText(hwnd) != '':
-        resultList.append((hwnd, win32gui.GetWindowText(hwnd)))
+youtube_dl_loc = os.path.realpath("C:/Users/vince/youtube-dl.exe")
+google_drive_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
 
-
-def get_app_list(handles=[]):
-    mlst = []
-    win32gui.EnumWindows(window_enum_handler, handles)
-    for handle in handles:
-        mlst.append(handle)
-    return mlst
-'''
-
-class NotYoutube(Exception):
-    def __init__(self, message):
-
-        # Call the base class constructor with the parameters it needs
-        super().__init__(message)
 
 def main():
-    # TODO: Install all this stuff so it can run natively, outside of venv
-
-    print("Opening cmd to download...")
     shell = win32com.client.Dispatch("WScript.Shell")
-
 
     # Dump clipboard data into a variable
     win32clipboard.OpenClipboard()
     # clipboard_as_encoded_bytes = (win32clipboard.GetClipboardData(win32con.CF_TEXT))
-    clipboard_as_string = (win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
-        "utf-8")  # must decode from bytes to string
-    if clipboard_as_string.startswith("https://www.youtube.com/watch?v=") is False:
-        raise NotYoutube("The value on the clipboard is not a YouTube URL.")
+    clipboard_youtube_url = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
+        "utf-8"))  # must decode from bytes to string
     win32clipboard.CloseClipboard()
+    if (clipboard_youtube_url.startswith(
+            "https://www.youtube.com/watch?v=") is False and clipboard_youtube_url.startswith(
+        "https://youtu.be/") is False) or " " in clipboard_youtube_url:
+        raise Exception("The value on the clipboard is not a YouTube URL.")
 
-    # Open cmd and starts a new youtube-dl download
-    shell.Run("cmd.exe")
-    shell.AppActivate("cmd.exe")
-    win32api.Sleep(100)  # need this or else the SendKeys freaks out
-    shell.SendKeys("cd /d C:\\Users\\vince{Enter}")
-    shell.SendKeys("youtube-dl " + clipboard_as_string + " && exit")
-    shell.SendKeys("{Enter}")
-    handle = win32gui.FindWindow(0, "C:\\Windows\\System32\\cmd.exe")  # Has to be spelled out for some reason
-    win32gui.CloseWindow(handle)
+    # Strip out extra stuff in URL
+    if "&" in clipboard_youtube_url:
+        clipboard_youtube_url = clipboard_youtube_url.split("&")[0]
+    if "?t=" in clipboard_youtube_url:
+        clipboard_youtube_url = clipboard_youtube_url.split("?t=")[0]
 
-    '''
-    appwindows = get_app_list()
-    for i in appwindows:
-        print(i)
-    '''
+    global youtube_dl_loc
+    command = youtube_dl_loc + " " + clipboard_youtube_url + " && exit"
 
-    print("done!")
+    output_file = run_youtube_dl_cmd(command)
+    output_file_size = os.path.getsize(output_file)
+    if output_file_size < 104857600:  # 100 MB
+        # Use shutil to make sure the file is replaced if it already exists.
+        shutil.move(output_file, os.path.join(google_drive_dir, os.path.basename(output_file)))
+        print(str(output_file) + " moved to directory " + str(google_drive_dir))
+    else:
+        print("This file is quite large so we are not moving it to Google Drive.")
+
+
+def run_youtube_dl_cmd(cmd):
+    """
+    Runs a command in a new cmd window. This ONLY works on Windows OS.
+
+    :param cmd: The command to run.
+    :return:    The path of the file downloaded from YouTube.
+    """
+    print("INPUT COMMAND: " + str(cmd) + "\n")
+    result = []
+    process = subprocess.Popen(cmd,
+                               shell=True,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE
+                               )
+
+    output, error = process.communicate()  # Prevents cout and cerr from locking up cmd.
+    if output:
+        for line in output:
+            result.append(str(line))  # In case we need to print this
+    errcode = process.returncode  # 0 if completed
+
+    if errcode != 0:  # NOTE: This was originally None but that is incorrect
+        raise Exception('cmd %s failed, see above for details', cmd)
+
+    # Figure out the output file and move
+    output_filepath = None
+    lines = output.split(b'\n')
+    for line in lines:  # Decode converts from bytestring to string.
+        line = line.decode()
+        print(line)
+        if "Merging formats into" in line:
+            output_filepath = os.path.realpath(line.split("\"")[1])  # Index 1 in this will give us the filename.
+        if "has already been downloaded and merged" in line:
+            output_filepath = os.path.realpath(line.split("[download]")[1].strip().split(" has already")[0].strip())
+    if output_filepath is None:
+        raise Exception("ERROR: cmd ran but no output file was detected.")
+
+    return output_filepath
 
 
 if __name__ == "__main__":
