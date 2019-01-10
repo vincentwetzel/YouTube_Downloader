@@ -15,7 +15,6 @@ def main():
 
     # Dump clipboard data into a variable
     win32clipboard.OpenClipboard()
-    # clipboard_as_encoded_bytes = (win32clipboard.GetClipboardData(win32con.CF_TEXT))
     clipboard_youtube_url = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
         "utf-8"))  # must decode from bytes to string
     win32clipboard.CloseClipboard()
@@ -25,15 +24,28 @@ def main():
         raise Exception("The value on the clipboard is not a YouTube URL.")
 
     # Strip out extra stuff in URL
-    if "&" in clipboard_youtube_url:
-        clipboard_youtube_url = clipboard_youtube_url.split("&")[0]
+    # SAMPLE URLS:
+    # https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
+    # https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
+    is_playlist = False
+    if "&list=" in clipboard_youtube_url:
+        user_input = input("Do you want to download this whole playlist? (y/n): ")
+        if user_input.lower() == "y" or user_input.lower() == "yes":
+            is_playlist = True
     if "?t=" in clipboard_youtube_url:
         clipboard_youtube_url = clipboard_youtube_url.split("?t=")[0]
+    if "&t=" in clipboard_youtube_url:
+        clipboard_youtube_url = clipboard_youtube_url.split("&t=")[0]
 
+    # Run command to download the file
     global youtube_dl_loc
-    command = youtube_dl_loc + " " + clipboard_youtube_url + " && exit"
-
+    if is_playlist:
+        command = youtube_dl_loc + " -i --yes-playlist \"" + clipboard_youtube_url + "\" && exit"
+    else:
+        command = youtube_dl_loc + " " + clipboard_youtube_url + " && exit"
     output_file = run_youtube_dl_cmd(command)
+
+    # Put the downloaded file in its proper location
     output_file_size = os.path.getsize(output_file)
     if output_file_size < 104857600:  # 100 MB
         # Use shutil to make sure the file is replaced if it already exists.
