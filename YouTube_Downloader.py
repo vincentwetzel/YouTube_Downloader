@@ -43,56 +43,62 @@ def main():
         command = youtube_dl_loc + " -i --yes-playlist \"" + clipboard_youtube_url + "\" && exit"
     else:
         command = youtube_dl_loc + " " + clipboard_youtube_url + " && exit"
-    output_file = run_youtube_dl_cmd(command)
+    output_files = run_youtube_dl_cmd(command)
 
     # Put the downloaded file in its proper location
-    output_file_size = os.path.getsize(output_file)
-    if output_file_size < 104857600:  # 100 MB
-        # Use shutil to make sure the file is replaced if it already exists.
-        shutil.move(output_file, os.path.join(google_drive_dir, os.path.basename(output_file)))
-        print(str(output_file) + " moved to directory " + str(google_drive_dir))
-    else:
-        print("This file is quite large so we are not moving it to Google Drive.")
+    if not is_playlist:
+        for file in output_files:
+            output_file_size = os.path.getsize(file)
+            if output_file_size < 104857600:  # 100 MB
+                # Use shutil to make sure the file is replaced if it already exists.
+                shutil.move(file, os.path.join(google_drive_dir, os.path.basename(file)))
+                print(str(file) + " moved to directory " + str(google_drive_dir))
+            if output_file_size > 104857600:  # 100 MB
+                print("This file is quite large so we are not moving it to Google Drive.")
+
+    print("All done! The code was successful.")
 
 
-def run_youtube_dl_cmd(cmd):
+def run_youtube_dl_cmd(command):
     """
     Runs a command in a new cmd window. This ONLY works on Windows OS.
 
-    :param cmd: The command to run.
+    :param command: The command to run.
     :return:    The path of the file downloaded from YouTube.
     """
-    print("INPUT COMMAND: " + str(cmd) + "\n")
+    print("INPUT COMMAND: " + str(command) + "\n")
     result = []
-    process = subprocess.Popen(cmd,
-                               shell=True,
-                               # stdout=subprocess.PIPE, # Prevents output from showing in CMD window.
-                               # stderr=subprocess.PIPE  # Prevents output from showing in CMD window.
-                               )
+    process = subprocess.run(command, shell=True, capture_output=True, encoding='utf-8', universal_newlines=True)
+    for line in iter(process.stdout.read()):
+        print(line)
 
-    output, error = process.communicate()  # Prevents cout and cerr from locking up cmd.
+    print("---STDOUT---\n" + process.stdout)
+    print("---END STDOUT---")
+    output = process.stdout
     if output:
         for line in output:
             result.append(str(line))  # In case we need to print this
+    else:
+        raise Exception("There was no output for this cmd. Please fix this.")
     errcode = process.returncode  # 0 if completed
 
     if errcode != 0:  # NOTE: This was originally None but that is incorrect
-        raise Exception('cmd %s failed, see above for details', cmd)
+        raise Exception('command %s failed, see above for details', command)
 
     # Figure out the output file and move
-    output_filepath = None
-    lines = output.split(b'\n')
+    output_filepaths = []
+    lines = output.split('\n')
     for line in lines:  # Decode converts from bytestring to string.
-        line = line.decode()
-        print(line)
-        if "Merging formats into" in line:
-            output_filepath = os.path.realpath(line.split("\"")[1])  # Index 1 in this will give us the filename.
+        # print("LINE: " + line)
+        if "[ffmpeg] Merging formats into" in line:
+            output_filepaths.append(os.path.realpath(line.split("\"")[1]))  # Index 1 in this will give us the filename.
         if "has already been downloaded and merged" in line:
-            output_filepath = os.path.realpath(line.split("[download]")[1].strip().split(" has already")[0].strip())
-    if output_filepath is None:
-        raise Exception("ERROR: cmd ran but no output file was detected.")
+            output_filepaths.append(
+                os.path.realpath(line.split("[download]")[1].strip().split(" has already")[0].strip()))
+    if not output_filepaths:
+        raise Exception("ERROR: command ran but no output file was detected.")
 
-    return output_filepath
+    return output_filepaths
 
 
 if __name__ == "__main__":
