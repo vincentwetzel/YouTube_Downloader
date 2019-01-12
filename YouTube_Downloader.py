@@ -1,13 +1,11 @@
 import win32clipboard
-import win32com
 import subprocess
 import win32con
-import win32com.client
 import os
 import shutil
 
 youtube_dl_loc = os.path.realpath("C:/Users/vince/youtube-dl.exe")
-google_drive_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
+final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
 
 
 def main():
@@ -35,8 +33,36 @@ def main():
     if "&t=" in clipboard_youtube_url:
         clipboard_youtube_url = clipboard_youtube_url.split("&t=")[0]
 
-    # Figure out the formatting of the command to run in cmd
-    global youtube_dl_loc
+    # Run a command to see if the file already exists and we should skip the download.
+    # NOTE: This will only produce 1 line of output
+    command = youtube_dl_loc + " --skip-download --get-title " + clipboard_youtube_url
+    print()  # Formatting for prettier output
+    for video_title in run_win_cmd(command):
+        video_title = video_title.strip()
+
+        # Colons are not valid in file names in Windows so youtube-dl changes them and we must do the same.
+        if ":" in video_title:
+            video_title = video_title.replace(":", " -")
+
+        print("VIDEO TITLE: " + video_title + "\n")
+
+        google_drive_files = os.listdir(final_destination_dir)
+        for i, file in enumerate(google_drive_files):
+            google_drive_files[i] = os.path.splitext(os.path.basename(file))[0].strip()
+
+        if video_title in google_drive_files:
+            while True:
+                choice = input("We have detected that this file has already been downloaded to " + str(
+                    final_destination_dir) + ". Do you want to download it again? (y/n)").lower()
+                if choice == "y" or choice == "yes":
+                    break  # Continue running the script in the normal way as if none of this happened.
+                elif choice == "n" or choice == "no":
+                    print("\nThis script will now terminate.")
+                    exit(0)
+                else:
+                    print("That didn't work. Please try again.\n")
+
+    # Figure out the formatting of the DOWNLOAD command to run in cmd
     if is_playlist:
         command = youtube_dl_loc + " -i --yes-playlist \"" + clipboard_youtube_url + "\" && exit"
     else:
@@ -46,11 +72,11 @@ def main():
     # The stdout values will be returned via a generator.
     output_filepaths = []
     for line in run_win_cmd(command):
-        # Figure out the output file and move
-        line = line.strip()
+        line = line.strip()  # Strip off \n from each line
         print(line)
         if "[ffmpeg] Merging formats into" in line:
-            output_filepaths.append(os.path.realpath(line.split("\"")[1]))  # Index 1 in this will give us the filename.
+            output_filepaths.append(
+                os.path.realpath(line.split("\"")[1]))  # Index 1 in this will give us the filename.
         if "has already been downloaded and merged" in line:
             output_filepaths.append(
                 os.path.realpath(line.split("[download]")[1].strip().split(" has already")[0].strip()))
@@ -64,10 +90,10 @@ def main():
             output_file_size = os.path.getsize(file)
             if output_file_size < 104857600:  # 100 MB
                 # Use shutil to make sure the file is replaced if it already exists.
-                shutil.move(file, os.path.join(google_drive_dir, os.path.basename(file)))
-                print(str(file) + " moved to directory " + str(google_drive_dir))
+                shutil.move(file, os.path.join(final_destination_dir, os.path.basename(file)))
+                print("\n" + str(file) + " moved to directory " + str(final_destination_dir))
             if output_file_size > 104857600:  # 100 MB
-                print("This file is quite large so we are not moving it to Google Drive.")
+                print("\nThis file is quite large so we are not moving it to Google Drive.")
 
     # Done!
 
@@ -80,6 +106,7 @@ def run_win_cmd(command):
 
     :param command: The command to run.
     """
+
     print("INPUT COMMAND: " + str(command) + "\n")
     process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     for stdout_line in iter(process.stdout.readline, ""):
