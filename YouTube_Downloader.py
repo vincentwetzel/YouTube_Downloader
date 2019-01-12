@@ -46,10 +46,12 @@ def main():
 
         print("VIDEO TITLE: " + video_title + "\n")
 
+        # Get a list of the files in the final output directory
         google_drive_files = os.listdir(final_destination_dir)
         for i, file in enumerate(google_drive_files):
             google_drive_files[i] = os.path.splitext(os.path.basename(file))[0].strip()
 
+        # If our download already exists, handle the situation.
         if video_title in google_drive_files:
             while True:
                 choice = input("We have detected that this file has already been downloaded to " + str(
