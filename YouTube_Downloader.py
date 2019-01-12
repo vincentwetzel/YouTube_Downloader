@@ -11,8 +11,6 @@ google_drive_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)"
 
 
 def main():
-    shell = win32com.client.Dispatch("WScript.Shell")
-
     # Dump clipboard data into a variable
     win32clipboard.OpenClipboard()
     clipboard_youtube_url = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
@@ -37,59 +35,20 @@ def main():
     if "&t=" in clipboard_youtube_url:
         clipboard_youtube_url = clipboard_youtube_url.split("&t=")[0]
 
-    # Run command to download the file
+    # Figure out the formatting of the command to run in cmd
     global youtube_dl_loc
     if is_playlist:
         command = youtube_dl_loc + " -i --yes-playlist \"" + clipboard_youtube_url + "\" && exit"
     else:
         command = youtube_dl_loc + " " + clipboard_youtube_url + " && exit"
-    output_files = run_youtube_dl_cmd(command)
 
-    # Put the downloaded file in its proper location
-    if not is_playlist:
-        for file in output_files:
-            output_file_size = os.path.getsize(file)
-            if output_file_size < 104857600:  # 100 MB
-                # Use shutil to make sure the file is replaced if it already exists.
-                shutil.move(file, os.path.join(google_drive_dir, os.path.basename(file)))
-                print(str(file) + " moved to directory " + str(google_drive_dir))
-            if output_file_size > 104857600:  # 100 MB
-                print("This file is quite large so we are not moving it to Google Drive.")
-
-    print("All done! The code was successful.")
-
-
-def run_youtube_dl_cmd(command):
-    """
-    Runs a command in a new cmd window. This ONLY works on Windows OS.
-
-    :param command: The command to run.
-    :return:    The path of the file downloaded from YouTube.
-    """
-    print("INPUT COMMAND: " + str(command) + "\n")
-    result = []
-    process = subprocess.run(command, shell=True, capture_output=True, encoding='utf-8', universal_newlines=True)
-    for line in iter(process.stdout.read()):
-        print(line)
-
-    print("---STDOUT---\n" + process.stdout)
-    print("---END STDOUT---")
-    output = process.stdout
-    if output:
-        for line in output:
-            result.append(str(line))  # In case we need to print this
-    else:
-        raise Exception("There was no output for this cmd. Please fix this.")
-    errcode = process.returncode  # 0 if completed
-
-    if errcode != 0:  # NOTE: This was originally None but that is incorrect
-        raise Exception('command %s failed, see above for details', command)
-
-    # Figure out the output file and move
+    # Run command to download the file
+    # The stdout values will be returned via a generator.
     output_filepaths = []
-    lines = output.split('\n')
-    for line in lines:  # Decode converts from bytestring to string.
-        # print("LINE: " + line)
+    for line in run_win_cmd(command):
+        # Figure out the output file and move
+        line = line.strip()
+        print(line)
         if "[ffmpeg] Merging formats into" in line:
             output_filepaths.append(os.path.realpath(line.split("\"")[1]))  # Index 1 in this will give us the filename.
         if "has already been downloaded and merged" in line:
@@ -98,7 +57,38 @@ def run_youtube_dl_cmd(command):
     if not output_filepaths:
         raise Exception("ERROR: command ran but no output file was detected.")
 
-    return output_filepaths
+    # Put the downloaded file in its proper location
+    # For playlists, leave them in the default download directory.
+    if not is_playlist:
+        for file in output_filepaths:
+            output_file_size = os.path.getsize(file)
+            if output_file_size < 104857600:  # 100 MB
+                # Use shutil to make sure the file is replaced if it already exists.
+                shutil.move(file, os.path.join(google_drive_dir, os.path.basename(file)))
+                print(str(file) + " moved to directory " + str(google_drive_dir))
+            if output_file_size > 104857600:  # 100 MB
+                print("This file is quite large so we are not moving it to Google Drive.")
+
+    # Done!
+
+
+def run_win_cmd(command):
+    """
+    Runs a command in a new cmd window.
+    This function ONLY works on Windows OS.
+    The values output in the CMD window are now piped through a generator.
+
+    :param command: The command to run.
+    """
+    print("INPUT COMMAND: " + str(command) + "\n")
+    process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    for stdout_line in iter(process.stdout.readline, ""):
+        yield stdout_line
+
+    # Once the process has completed, get the return code to see if the process was successful.
+    return_code = process.wait()
+    if return_code != 0:
+        raise Exception('command %s failed, see above for details', command)
 
 
 if __name__ == "__main__":
