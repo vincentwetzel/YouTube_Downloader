@@ -4,9 +4,10 @@ import win32con
 import os
 import shutil
 
-youtube_dl_loc = os.path.realpath("C:/Users/vince/youtube-dl.exe")
+youtube_dl_loc = os.path.realpath(os.path.join(str(os.path.expanduser("~")), "youtube-dl.exe"))
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
 
+print(youtube_dl_loc)
 
 def main():
     # Dump clipboard data into a variable
