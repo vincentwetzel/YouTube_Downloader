@@ -24,6 +24,8 @@ def main():
     # https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
     # https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
     is_playlist = False
+    if "&feature=" in clipboard_youtube_url:
+        clipboard_youtube_url = clipboard_youtube_url.split("&feature=")[0]
     if "&list=" in clipboard_youtube_url:
         user_input = input("Do you want to download this whole playlist? (y/n): ")
         if user_input.lower() == "y" or user_input.lower() == "yes":
@@ -109,7 +111,7 @@ def run_win_cmd(command):
     :param command: The command to run.
     """
 
-    print("INPUT COMMAND: " + str(command) + "\n")
+    print(str(command) + "\n")
     process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     for stdout_line in iter(process.stdout.readline, ""):
         yield stdout_line
