@@ -78,9 +78,8 @@ def main():
     for line in run_win_cmd(command):
         line = line.strip()  # Strip off \n from each line
         print(line)
-        if "[ffmpeg] Merging formats into" in line:
-            output_filepaths.append(
-                os.path.realpath(line.split("\"")[1]))  # Index 1 in this will give us the filename.
+        if "[download] Destination: " in line:
+            output_filepaths.append(os.path.realpath(line.split("[download] Destination: ")[1]))
         if "has already been downloaded and merged" in line:
             output_filepaths.append(
                 os.path.realpath(line.split("[download]")[1].strip().split(" has already")[0].strip()))
