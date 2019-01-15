@@ -61,8 +61,8 @@ def main():
 
         # Get a list of the files in the final output directory
         google_drive_files = os.listdir(final_destination_dir)
-        for i, file in enumerate(google_drive_files):
-            google_drive_files[i] = os.path.splitext(os.path.basename(file))[0].strip()
+        for i, output_file in enumerate(google_drive_files):
+            google_drive_files[i] = os.path.splitext(os.path.basename(output_file))[0].strip()
 
         # If our download already exists, handle the situation.
         if video_title in google_drive_files:
@@ -109,12 +109,22 @@ def main():
     # Put the downloaded file in its proper location
     # For playlists, leave them in the default download directory.
     if not is_playlist:
-        for file in output_filepaths:
-            output_file_size = os.path.getsize(file)
+        for output_file in output_filepaths:
+            try:
+                output_file_size = os.path.getsize(output_file)
+            except FileNotFoundError:
+                # This usually happens when there was an issue during the download
+                # with decoding output from youtube-dl in order to grab the file name.
+                start_of_file_name = re.search(r".+?(?=�)", os.path.basename(output_file)).group(0)
+                for f in os.listdir(os.path.dirname(output_file)):
+                    if os.path.basename(f).startswith(start_of_file_name):
+                        output_file = os.path.realpath(
+                            os.path.join(os.path.dirname(output_file), os.path.basename(f)))
+                output_file_size = os.path.getsize(output_file)
             if output_file_size < 104857600:  # 100 MB
                 # Use shutil to make sure the file is replaced if it already exists.
-                shutil.move(file, os.path.join(final_destination_dir, os.path.basename(file)))
-                print("\n" + str(file) + " moved to directory " + str(final_destination_dir))
+                shutil.move(output_file, os.path.join(final_destination_dir, os.path.basename(output_file)))
+                print("\n" + str(output_file) + " moved to directory " + str(final_destination_dir))
             if output_file_size > 104857600:  # 100 MB
                 print("\nThis file is quite large so we are not moving it to Google Drive.")
 
@@ -131,7 +141,9 @@ def run_win_cmd(command):
     """
 
     print(str(command) + "\n")
-    process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    # Note: errors="ignore" ignores special characters and returns the string without them.
+    process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               errors="replace")
     for stdout_line in iter(process.stdout.readline, ""):
         yield stdout_line
 
