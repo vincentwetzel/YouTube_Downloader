@@ -5,6 +5,11 @@ import os
 import shutil
 import re
 
+# SAMPLE URLS:
+# https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
+# https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
+# https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
+
 youtube_dl_loc = os.path.realpath(os.path.join(str(os.path.expanduser("~")), "youtube-dl.exe"))
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
 
@@ -21,35 +26,41 @@ def main():
         raise Exception("The value on the clipboard is not a YouTube URL.")
 
     # Strip out extra stuff in URL
-    # SAMPLE URLS:
-    # https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
-    # https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
-    # https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
-    is_playlist = False
-    if "&feature=" in clipboard_youtube_url:
-        clipboard_youtube_url = clipboard_youtube_url.split("&feature=")[0]
-    if "&list=" in clipboard_youtube_url:
+    download_playlist_yes = False
+    simplified_youtube_url = clipboard_youtube_url
+    if "&list=" in simplified_youtube_url:
         user_input = input("Do you want to download this whole playlist? (y/n): ")
         if user_input.lower() == "y" or user_input.lower() == "yes":
-            is_playlist = True
-    if "?t=" in clipboard_youtube_url:
-        clipboard_youtube_url = clipboard_youtube_url.split("?t=")[0]
-    if "&t=" in clipboard_youtube_url:
-        clipboard_youtube_url = clipboard_youtube_url.split("&t=")[0]
-    if "time_continue" in clipboard_youtube_url:
-        # EXAMPLE:
-        # Original URL: https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
-        # First half: https://www.youtube.com/watch?
-        # Second half: v=EYDwHSGgkm8
-
-        first_half = re.search(r".+?(?=time_continue)", clipboard_youtube_url).group(0)
-        second_half = re.search(r"(?<=time_continue=).*&(.*)", clipboard_youtube_url).group(1)
-        clipboard_youtube_url = "".join([first_half, second_half])
+            download_playlist_yes = True
+    if "&feature=" in simplified_youtube_url:
+        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "&feature")
+    if "?t=" in simplified_youtube_url:
+        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "?t=")
+    if "&t=" in simplified_youtube_url:
+        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "&t")
+    if "time_continue" in simplified_youtube_url:
+        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "time_continue")
 
     # Run a command to see if the file already exists and we should skip the download.
     # NOTE: This will only produce 1 line of output
-    command = youtube_dl_loc + " --skip-download --get-title " + clipboard_youtube_url
+    if download_playlist_yes:
+        command = youtube_dl_loc + " --skip-download --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
+    else:
+        if "&list" in simplified_youtube_url:
+            command = youtube_dl_loc + " --skip-download --get-title " + strip_argument_from_youtube_url(
+                simplified_youtube_url, "&list")
+        else:
+            command = youtube_dl_loc + " --skip-download --get-title " + simplified_youtube_url
+
     print()  # Formatting for prettier output
+
+    # Get a list of the files in the final output directory
+    google_drive_files = os.listdir(final_destination_dir)
+    for i, output_file in enumerate(google_drive_files):
+        google_drive_files[i] = os.path.splitext(os.path.basename(output_file))[0].strip()
+
+    redownload_videos = None  # Set this flag to true if the user tells you to. If the flag would be set to false then it will kill the script.
+
     for video_title in run_win_cmd(command):
         video_title = video_title.strip()
 
@@ -57,19 +68,16 @@ def main():
         if ":" in video_title:
             video_title = video_title.replace(":", " -")
 
-        print("VIDEO TITLE: " + video_title + "\n")
-
-        # Get a list of the files in the final output directory
-        google_drive_files = os.listdir(final_destination_dir)
-        for i, output_file in enumerate(google_drive_files):
-            google_drive_files[i] = os.path.splitext(os.path.basename(output_file))[0].strip()
+        # Print the video title
+        print("VIDEO TITLE: " + video_title)
 
         # If our download already exists, handle the situation.
-        if video_title in google_drive_files:
+        if video_title in google_drive_files and redownload_videos is None: # TODO: Make sure this is not a .part file as well. This will help us handle resuming downloads
             while True:
                 choice = input("We have detected that this file has already been downloaded to " + str(
                     final_destination_dir) + ". Do you want to download it again? (y/n)").lower()
                 if choice == "y" or choice == "yes":
+                    redownload_videos = True
                     break  # Continue running the script in the normal way as if none of this happened.
                 elif choice == "n" or choice == "no":
                     print("\nThis script will now terminate.")
@@ -77,11 +85,13 @@ def main():
                 else:
                     print("That didn't work. Please try again.\n")
 
+    print()  # Output formatting
+
     # Figure out the formatting of the DOWNLOAD command to run in cmd
-    if is_playlist:
-        command = youtube_dl_loc + " -i --yes-playlist \"" + clipboard_youtube_url + "\" && exit"
+    if download_playlist_yes:
+        command = youtube_dl_loc + " -i --yes-playlist \"" + simplified_youtube_url + "\" && exit"
     else:
-        command = youtube_dl_loc + " " + clipboard_youtube_url + " && exit"
+        command = youtube_dl_loc + " " + simplified_youtube_url + " && exit"
 
     # Run command to download the file
     # The stdout values will be returned via a generator.
@@ -108,7 +118,7 @@ def main():
 
     # Put the downloaded file in its proper location
     # For playlists, leave them in the default download directory.
-    if not is_playlist:
+    if not download_playlist_yes:
         for output_file in output_filepaths:
             try:
                 output_file_size = os.path.getsize(output_file)
@@ -129,6 +139,22 @@ def main():
                 print("\nThis file is quite large so we are not moving it to Google Drive.")
 
     # Done!
+
+
+def strip_argument_from_youtube_url(url, argument):
+    """
+    This strips an argument out of a YouTube URL.
+
+    :param url:     A full youtube URL.
+    :param argument:    The parameter to strip out.
+                        If you need to strip out an '&' symbol then that MUST be included when passing it to this method.
+    :return:    The URL without the argument.
+    """
+    first_search = r".+?(?=)" + argument + r")"
+    first_half = re.search(first_search, url).group(0)
+    second_search = r"(?<=" + argument + r"=).*&(.*)"
+    second_half = re.search(second_search, url).group(1)
+    return "".join([first_half, second_half])
 
 
 def run_win_cmd(command):
