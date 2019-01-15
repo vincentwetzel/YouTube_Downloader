@@ -3,6 +3,7 @@ import subprocess
 import win32con
 import os
 import shutil
+import re
 
 youtube_dl_loc = os.path.realpath(os.path.join(str(os.path.expanduser("~")), "youtube-dl.exe"))
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
@@ -15,7 +16,7 @@ def main():
         "utf-8"))  # must decode from bytes to string
     win32clipboard.CloseClipboard()
     if (clipboard_youtube_url.startswith(
-            "https://www.youtube.com/watch?v=") is False and clipboard_youtube_url.startswith(
+            "https://www.youtube.com/watch?") is False and clipboard_youtube_url.startswith(
         "https://youtu.be/") is False) or " " in clipboard_youtube_url:
         raise Exception("The value on the clipboard is not a YouTube URL.")
 
@@ -23,6 +24,7 @@ def main():
     # SAMPLE URLS:
     # https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
     # https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
+    # https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
     is_playlist = False
     if "&feature=" in clipboard_youtube_url:
         clipboard_youtube_url = clipboard_youtube_url.split("&feature=")[0]
@@ -34,6 +36,15 @@ def main():
         clipboard_youtube_url = clipboard_youtube_url.split("?t=")[0]
     if "&t=" in clipboard_youtube_url:
         clipboard_youtube_url = clipboard_youtube_url.split("&t=")[0]
+    if "time_continue" in clipboard_youtube_url:
+        # EXAMPLE:
+        # Original URL: https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
+        # First half: https://www.youtube.com/watch?
+        # Second half: v=EYDwHSGgkm8
+
+        first_half = re.search(r".+?(?=time_continue)", clipboard_youtube_url).group(0)
+        second_half = re.search(r"(?<=time_continue=).*&(.*)", clipboard_youtube_url).group(1)
+        clipboard_youtube_url = "".join([first_half, second_half])
 
     # Run a command to see if the file already exists and we should skip the download.
     # NOTE: This will only produce 1 line of output
@@ -75,11 +86,17 @@ def main():
     # Run command to download the file
     # The stdout values will be returned via a generator.
     output_filepaths = []
+    merge_required = False
     for line in run_win_cmd(command):
         line = line.strip()  # Strip off \n from each line
         print(line)
-        if "[download] Destination: " in line and ".f248." not in line:
-            output_filepaths.append(os.path.realpath(line.split("[download] Destination: ")[1]))
+        if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
+            merge_required = True
+        if "[download] Destination: " in line and merge_required is False:
+            if re.search(r".f[0-9]{3}", line) is not None:
+                merge_required = True
+            else:
+                output_filepaths.append(os.path.realpath(line.split("[download] Destination: ")[1]))
         if "[ffmpeg] Merging formats into" in line:
             output_filepaths.append(
                 os.path.realpath(line.split("\"")[1]))  # Index 1 in this will give us the filename.
