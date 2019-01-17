@@ -9,6 +9,7 @@ import re
 # https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
 # https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
 # https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
+# https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
 
 youtube_dl_loc = os.path.realpath(os.path.join(str(os.path.expanduser("~")), "youtube-dl.exe"))
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
@@ -28,10 +29,13 @@ def main():
     # Strip out extra stuff in URL
     download_playlist_yes = False
     simplified_youtube_url = clipboard_youtube_url
+
+    # Check for values we want to strip out of the URL
     if "&list=" in simplified_youtube_url:
         user_input = input("Do you want to download this whole playlist? (y/n): ")
         if user_input.lower() == "y" or user_input.lower() == "yes":
             download_playlist_yes = True
+
     if "&feature=" in simplified_youtube_url:
         simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "&feature")
     if "?t=" in simplified_youtube_url:
@@ -52,14 +56,16 @@ def main():
         else:
             command = youtube_dl_loc + " --skip-download --get-title " + simplified_youtube_url
 
-    print()  # Formatting for prettier output
+    # Output formatting
+    print()
 
     # Get a list of the files in the final output directory
     google_drive_files = os.listdir(final_destination_dir)
     for i, output_file in enumerate(google_drive_files):
         google_drive_files[i] = os.path.splitext(os.path.basename(output_file))[0].strip()
 
-    redownload_videos = None  # Set this flag to true if the user tells you to. If the flag would be set to false then it will kill the script.
+    # Set a flag that can be toggled if we need to kill the script.
+    redownload_videos = None
 
     for video_title in run_win_cmd(command):
         video_title = video_title.strip()
@@ -72,7 +78,7 @@ def main():
         print("VIDEO TITLE: " + video_title)
 
         # If our download already exists, handle the situation.
-        if video_title in google_drive_files and redownload_videos is None: # TODO: Make sure this is not a .part file as well. This will help us handle resuming downloads
+        if video_title in google_drive_files and redownload_videos is None:  # TODO: Make sure this is not a .part file as well. This will help us handle resuming downloads
             while True:
                 choice = input("We have detected that this file has already been downloaded to " + str(
                     final_destination_dir) + ". Do you want to download it again? (y/n)").lower()
@@ -150,11 +156,18 @@ def strip_argument_from_youtube_url(url, argument):
                         If you need to strip out an '&' symbol then that MUST be included when passing it to this method.
     :return:    The URL without the argument.
     """
-    first_search = r".+?(?=)" + argument + r")"
+
+    first_search = r".+?(?=" + argument + r")"
     first_half = re.search(first_search, url).group(0)
+
+    # NOTE: Sometimes the 2nd half will be empty (None)
+    # EXAMPLE: https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
     second_search = r"(?<=" + argument + r"=).*&(.*)"
-    second_half = re.search(second_search, url).group(1)
-    return "".join([first_half, second_half])
+    second_half = None
+    if re.search(second_search, url) is not None:
+        second_half = re.search(second_search, url).group(0)
+
+    return "".join([first_half, second_half]) if second_half else first_half
 
 
 def run_win_cmd(command):
