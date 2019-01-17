@@ -137,11 +137,11 @@ def main():
                         output_file = os.path.realpath(
                             os.path.join(os.path.dirname(output_file), os.path.basename(f)))
                 output_file_size = os.path.getsize(output_file)
-            if output_file_size < 104857600:  # 100 MB
+            if output_file_size < 209715200:  # 200 MB
                 # Use shutil to make sure the file is replaced if it already exists.
                 shutil.move(output_file, os.path.join(final_destination_dir, os.path.basename(output_file)))
                 print("\n" + str(output_file) + " moved to directory " + str(final_destination_dir))
-            if output_file_size > 104857600:  # 100 MB
+            else:
                 print("\nThis file is quite large so we are not moving it to Google Drive.")
 
     # Done!
