@@ -1,3 +1,3 @@
-python "E:\coding_workspaces\Python\Youtube_Downloader\YouTube_Downloader.py"
+python %~dp0\Youtube_Downloader.py
 
-#pause
+pause

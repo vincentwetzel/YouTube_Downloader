@@ -108,7 +108,7 @@ def main():
         if download_playlist_yes:
             command = youtube_dl_loc + " -i -f best[ext=mp4]/best --yes-playlist \"" + simplified_youtube_url + "\" && exit"
         else:
-            command = youtube_dl_loc + " -f best[ext=mp4]/best " + simplified_youtube_url + " && exit"
+            command = youtube_dl_loc + " -f best[ext=mp4]/best " + strip_argument_from_youtube_url(simplified_youtube_url, "&list") + " && exit"
 
     # Run command to download the file
     # The stdout values will be returned via a generator.
