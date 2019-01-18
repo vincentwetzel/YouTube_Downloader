@@ -45,6 +45,8 @@ def main():
         simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "&t")
     if "time_continue" in simplified_youtube_url:
         simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "time_continue")
+    if "&index" in simplified_youtube_url:
+        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "&index")
 
     # Run a command to see if the file already exists and we should skip the download.
     # NOTE: This will only produce 1 line of output
@@ -78,11 +80,7 @@ def main():
 
         # Print the video title(s)
         print("VIDEO TITLE: " if len(video_titles) == 1 else "VIDEO TITLES: ")
-        if len(video_titles) == 1:
-            print(video_titles[0])
-        else:
-            for count, title in enumerate(video_titles, 1):
-                print(str(count) + ". " + str(title))
+        print(video_title[(len(video_titles) - 1)])
 
         # If our download already exists, handle the situation.
         if video_title in google_drive_files and redownload_videos is None:
