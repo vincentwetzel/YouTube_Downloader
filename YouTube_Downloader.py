@@ -66,16 +66,22 @@ def main():
 
     # Set a flag that can be toggled if we need to kill the script.
     redownload_videos = None
+    video_titles = []
 
+    # Get the video title(s) for the file(s) we are downloading.
     for video_title in run_win_cmd(command):
         video_title = video_title.strip()
 
         # Colons are not valid in file names in Windows so youtube-dl changes them and we must do the same.
-        if ":" in video_title:
-            video_title = video_title.replace(":", " -")
+        video_titles.append(video_title.replace(":", " -"))
 
-        # Print the video title
-        print("VIDEO TITLE: " + video_title)
+        # Print the video title(s)
+        print("VIDEO TITLE: " if len(video_titles) == 1 else "VIDEO TITLES: ")
+        if len(video_titles) == 1:
+            print(video_titles[0])
+        else:
+            for count, title in enumerate(video_titles, 1):
+                print(str(count) + ". " + str(title))
 
         # If our download already exists, handle the situation.
         if video_title in google_drive_files and redownload_videos is None:  # TODO: Make sure this is not a .part file as well. This will help us handle resuming downloads
@@ -95,9 +101,9 @@ def main():
 
     # Figure out the formatting of the DOWNLOAD command to run in cmd
     if download_playlist_yes:
-        command = youtube_dl_loc + " -i --yes-playlist \"" + simplified_youtube_url + "\" && exit"
+        command = youtube_dl_loc + " -i -f best[ext=mp4]/best --yes-playlist \"" + simplified_youtube_url + "\" && exit"
     else:
-        command = youtube_dl_loc + " " + simplified_youtube_url + " && exit"
+        command = youtube_dl_loc + " -f best[ext=mp4]/best " + simplified_youtube_url + " && exit"
 
     # Run command to download the file
     # The stdout values will be returned via a generator.
