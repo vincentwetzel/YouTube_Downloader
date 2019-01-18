@@ -4,6 +4,7 @@ import win32con
 import os
 import shutil
 import re
+import sys
 
 # SAMPLE URLS:
 # https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
@@ -84,7 +85,7 @@ def main():
                 print(str(count) + ". " + str(title))
 
         # If our download already exists, handle the situation.
-        if video_title in google_drive_files and redownload_videos is None:  # TODO: Make sure this is not a .part file as well. This will help us handle resuming downloads
+        if video_title in google_drive_files and redownload_videos is None:
             while True:
                 choice = input("We have detected that this file has already been downloaded to " + str(
                     final_destination_dir) + ". Do you want to download it again? (y/n)").lower()
@@ -100,10 +101,16 @@ def main():
     print()  # Output formatting
 
     # Figure out the formatting of the DOWNLOAD command to run in cmd
-    if download_playlist_yes:
-        command = youtube_dl_loc + " -i -f best[ext=mp4]/best --yes-playlist \"" + simplified_youtube_url + "\" && exit"
+    if len(sys.argv) > 1 and sys.argv[1] == "mp3":
+        if download_playlist_yes:
+            command = youtube_dl_loc + " --extract-audio --audio-format mp3 --yes-playlist \"" + simplified_youtube_url + "\" && exit"
+        else:
+            command = youtube_dl_loc + " --extract-audio --audio-format mp3 " + simplified_youtube_url + " && exit"
     else:
-        command = youtube_dl_loc + " -f best[ext=mp4]/best " + simplified_youtube_url + " && exit"
+        if download_playlist_yes:
+            command = youtube_dl_loc + " -i -f best[ext=mp4]/best --yes-playlist \"" + simplified_youtube_url + "\" && exit"
+        else:
+            command = youtube_dl_loc + " -f best[ext=mp4]/best " + simplified_youtube_url + " && exit"
 
     # Run command to download the file
     # The stdout values will be returned via a generator.
