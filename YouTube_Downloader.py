@@ -80,7 +80,7 @@ def main():
 
         # Print the video title(s)
         print("VIDEO TITLE: " if len(video_titles) == 1 else "VIDEO TITLES: ")
-        print(video_title[(len(video_titles) - 1)])
+        print(video_titles[(len(video_titles) - 1)])
 
         # If our download already exists, handle the situation.
         if video_title in google_drive_files and redownload_videos is None:
@@ -108,7 +108,11 @@ def main():
         if download_playlist_yes:
             command = youtube_dl_loc + " -i -f best[ext=mp4]/best --yes-playlist \"" + simplified_youtube_url + "\" && exit"
         else:
-            command = youtube_dl_loc + " -f best[ext=mp4]/best " + strip_argument_from_youtube_url(simplified_youtube_url, "&list") + " && exit"
+            if "&list" in simplified_youtube_url:
+                command = youtube_dl_loc + " -f best[ext=mp4]/best " + strip_argument_from_youtube_url(
+                    simplified_youtube_url, "&list") + " && exit"
+            else:
+                command = youtube_dl_loc + " -f best[ext=mp4]/best " + simplified_youtube_url + " && exit"
 
     # Run command to download the file
     # The stdout values will be returned via a generator.
