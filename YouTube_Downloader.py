@@ -101,9 +101,9 @@ def main():
     # Figure out the formatting of the DOWNLOAD command to run in cmd
     if len(sys.argv) > 1 and sys.argv[1] == "mp3":
         if download_playlist_yes:
-            command = youtube_dl_loc + " --extract-audio --audio-format mp3 --yes-playlist \"" + simplified_youtube_url + "\" && exit"
+            command = youtube_dl_loc + " -f best --extract-audio --audio-format mp3 --yes-playlist \"" + simplified_youtube_url + "\" && exit"
         else:
-            command = youtube_dl_loc + " --extract-audio --audio-format mp3 " + simplified_youtube_url + " && exit"
+            command = youtube_dl_loc + " -f best --extract-audio --audio-format mp3 " + simplified_youtube_url + " && exit"
     else:
         if download_playlist_yes:
             command = youtube_dl_loc + " -i -f best[ext=mp4]/best --yes-playlist \"" + simplified_youtube_url + "\" && exit"
@@ -123,6 +123,10 @@ def main():
         print(line)
         if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
             merge_required = True
+        if "ERROR: Did not get any data blocks" in line:
+            # TODO: Handle this error. Honestly this loop should be in its own method so if it has a problem we can return false and retry the method.
+            pass
+
         if "[download] Destination: " in line and merge_required is False:
             if re.search(r".f[0-9]{3}", line) is not None:
                 merge_required = True
