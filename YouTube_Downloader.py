@@ -124,7 +124,8 @@ def main():
         if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
             merge_required = True
         if "ERROR: Did not get any data blocks" in line:
-            # TODO: Handle this error. Honestly this loop should be in its own method so if it has a problem we can return false and retry the method.
+            # TODO: Handle this error.
+            # TODO: Honestly this loop should be in its own method so if it has a problem we can return false and retry the method.
             pass
 
         if "[download] Destination: " in line and merge_required is False:
