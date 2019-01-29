@@ -126,6 +126,7 @@ def main():
         if "ERROR: Did not get any data blocks" in line:
             # TODO: Handle this error.
             # TODO: Honestly this loop should be in its own method so if it has a problem we can return false and retry the method.
+            # EXAMPLE URL: https://www.youtube.com/watch?v=9YXVvr44Hwc
             pass
 
         if "[download] Destination: " in line and merge_required is False:
@@ -144,6 +145,7 @@ def main():
 
     # Put the downloaded file in its proper location
     # For playlists, leave them in the default download directory.
+    move_file = True
     if not download_playlist_yes:
         for output_file in output_filepaths:
             try:
@@ -158,11 +160,18 @@ def main():
                             os.path.join(os.path.dirname(output_file), os.path.basename(f)))
                 output_file_size = os.path.getsize(output_file)
             if output_file_size < 209715200:  # 200 MB
+                move_file = True
+            else:
+                user_input = input("This file is " + str(output_file_size) + ". Do you still want to move it to " + str(
+                    final_destination_dir) + "?(y/n)").lower()
+                if user_input == "y" or user_input == "yes":
+                    move_file = True
+                else:
+                    move_file = False
+            if move_file:
                 # Use shutil to make sure the file is replaced if it already exists.
                 shutil.move(output_file, os.path.join(final_destination_dir, os.path.basename(output_file)))
                 print("\n" + str(output_file) + " moved to directory " + str(final_destination_dir))
-            else:
-                print("\nThis file is quite large so we are not moving it to Google Drive.")
 
     # Done!
 
