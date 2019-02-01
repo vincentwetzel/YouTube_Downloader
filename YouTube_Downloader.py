@@ -36,13 +36,13 @@ def main():
     # Run a command to see if the file already exists and we should skip the download.
     # NOTE: This will only produce 1 line of output
     if download_playlist_yes:
-        command = youtube_dl_loc + " --skip-download --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
+        command = youtube_dl_loc + " --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
     else:
         if "&list" in simplified_youtube_url:
-            command = youtube_dl_loc + " --skip-download --get-title " + strip_argument_from_youtube_url(
+            command = youtube_dl_loc + " --get-title " + strip_argument_from_youtube_url(
                 simplified_youtube_url, "&list")
         else:
-            command = youtube_dl_loc + " --skip-download --get-title " + simplified_youtube_url
+            command = youtube_dl_loc + " --get-title " + simplified_youtube_url
 
     # Output formatting
     print()
