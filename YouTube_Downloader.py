@@ -87,7 +87,7 @@ def main():
                 move_file = True
             else:
                 user_input = input(
-                    "This file is " + sizeof_fmt(output_file_size) + ". Do you still want to move it to " + str(
+                    str(output_file) + " is " + sizeof_fmt(output_file_size) + ". Do you still want to move it to " + str(
                         final_destination_dir) + "?(y/n)").lower()
                 if user_input == "y" or user_input == "yes":
                     move_file = True
