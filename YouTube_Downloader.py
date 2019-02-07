@@ -14,8 +14,22 @@ import sys
 
 youtube_dl_loc = os.path.realpath(os.path.join(str(os.path.expanduser("~")), "youtube-dl.exe"))
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
+download_location_argument = "-o \"E:\%(title)s.%(ext)s\""
+download_location = os.path.realpath("E:/")
+
+youtube_dl_mp4_formats = [137, 136, 398, 22]
+"""
+137          mp4        1920x1080  1080p 4752k , avc1.640028, 30fps, video only, 481.99MiB
+398          mp4        1280x720   720p 1794k , av01.0.05M.08, 30fps, video only, 209.23MiB
+136          mp4        1280x720   720p 2697k , avc1.4d401f, 30fps, video only, 260.78MiB
+22           mp4        1280x720   hd720 1357k , avc1.64001F, mp4a.40.2@192k (44100Hz) (best)
+"""
 
 output_filepaths = []
+"""These are full filepaths for the downloaded file(s).
+This will be used to move the downloaded file(s) to Google Drive"""
+
+download_successful = False
 
 
 def main():
@@ -57,15 +71,28 @@ def main():
     # Output formatting
     print()
 
-    # Figure out the formatting of the DOWNLOAD command to run in cmd
-    command = determine_download_command(simplified_youtube_url, download_playlist_yes)
+    # Track failed download attempts so we can modify the youtube-dl command as needed.
+    failed_download_attempts = 0
 
-    # Run command to download the file
-    try:
+    while True:
+        command = determine_download_command(simplified_youtube_url, download_playlist_yes, failed_download_attempts)
+
+        # Run command to download the file
         run_youtube_dl_download(command)
-    except DataBlocksError:
-        # TODO: Handle this error
-        pass
+        if not download_successful:
+            print("Download attempt #" + str(failed_download_attempts + 1) + " failed.")
+            failed_download_attempts += 1
+
+            # Clear any .part files that might be associated with the failed download.
+            download_dir_list = os.listdir(download_location)
+            for title in video_titles:
+                for dir_item in download_dir_list:
+                    if title in dir_item:
+                        print("Deleting failed download file: " + str(dir_item))
+                        os.remove(os.path.join(download_location, dir_item))
+
+        else:
+            break
 
     # Put the downloaded file in its proper location
     # For playlists, leave them in the default download directory.
@@ -87,7 +114,8 @@ def main():
                 move_file = True
             else:
                 user_input = input(
-                    str(output_file) + " is " + sizeof_fmt(output_file_size) + ". Do you still want to move it to " + str(
+                    str(output_file) + " is " + sizeof_fmt(
+                        output_file_size) + ". Do you still want to move it to " + str(
                         final_destination_dir) + "?(y/n)").lower()
                 if user_input == "y" or user_input == "yes":
                     move_file = True
@@ -153,7 +181,7 @@ def strip_argument_from_youtube_url(url, argument):
     return "".join([first_half, second_half]) if second_half else first_half
 
 
-def determine_download_command(simplified_youtube_url, download_playlist_yes):
+def determine_download_command(simplified_youtube_url, download_playlist_yes, failed_download_attempts):
     """
     Figures out the correct youtube-dl command to run.
 
@@ -161,20 +189,38 @@ def determine_download_command(simplified_youtube_url, download_playlist_yes):
     :param download_playlist_yes:   A Boolean to determine if the full playlist should be downloaded (if applicable).
     :return:    A string with the correct download command.
     """
-    if len(sys.argv) > 1 and sys.argv[1] == "mp3":
-        if download_playlist_yes:
-            command = youtube_dl_loc + " -f best --extract-audio --audio-format mp3 --yes-playlist \"" + simplified_youtube_url + "\" && exit"
-        else:
-            command = youtube_dl_loc + " -f best --extract-audio --audio-format mp3 " + simplified_youtube_url + " && exit"
+    if failed_download_attempts == 0:
+        dl_format = "-f best[ext=mp4]/best"
+    elif failed_download_attempts == 1:
+        dl_format = "-f best"
+    elif failed_download_attempts < (2 + len(youtube_dl_mp4_formats)):
+        dl_format = "-f " + str(youtube_dl_mp4_formats[failed_download_attempts - 2])
     else:
+        dl_format = ""
+
+    command = youtube_dl_loc + " " + str(dl_format) + " " + download_location_argument + " "
+    if len(sys.argv) > 1 and sys.argv[1] == "mp3":
+        # Audio downloads
+        command += "--extract-audio --audio-format mp3 "
         if download_playlist_yes:
-            command = youtube_dl_loc + " -i -f best[ext=mp4]/best --yes-playlist \"" + simplified_youtube_url + "\" && exit"
+            command += "--yes-playlist \"" + simplified_youtube_url + "\""
+        else:
+            command += simplified_youtube_url
+    else:
+        # Video downloads
+        if download_playlist_yes:
+            # Video playlists
+            command += "--yes-playlist \"" + simplified_youtube_url + "\""
         else:
             if "&list" in simplified_youtube_url:
-                command = youtube_dl_loc + " -f best[ext=mp4]/best " + strip_argument_from_youtube_url(
-                    simplified_youtube_url, "&list") + " && exit"
+                # Normal video with playlist in URL
+                command += strip_argument_from_youtube_url(
+                    simplified_youtube_url, "&list")
             else:
-                command = youtube_dl_loc + " -f best[ext=mp4]/best " + simplified_youtube_url + " && exit"
+                # Normal video
+                command += simplified_youtube_url
+
+    command += " && exit"
     return command
 
 
@@ -216,6 +262,10 @@ def get_video_titles(command, google_drive_files):
                     exit(0)
                 else:
                     print("That didn't work. Please try again.\n")
+
+    for i, s in enumerate(video_titles):
+        video_titles[i] = s.replace("|", "_")
+
     return video_titles
 
 
@@ -227,6 +277,8 @@ def run_youtube_dl_download(command):
     :param command: A youtube-dl command to download a video from a YouTube URL.
     :return:    None
     """
+    global download_successful
+    download_successful = False
 
     merge_required = False
     global output_filepaths
@@ -235,9 +287,6 @@ def run_youtube_dl_download(command):
         print(line)
         if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
             merge_required = True
-        if "ERROR: Did not get any data blocks" in line:
-            # EXAMPLE URL: https://www.youtube.com/watch?v=9YXVvr44Hwc
-            raise DataBlocksError("youtube-dl failed to get data blocks. Try downloading another format.")
 
         if "[download] Destination: " in line and merge_required is False:
             if re.search(r".f[0-9]{3}", line) is not None:
@@ -250,8 +299,9 @@ def run_youtube_dl_download(command):
         if "has already been downloaded" in line:
             output_filepaths.append(
                 os.path.realpath(line.split("[download]")[1].strip().split(" has already")[0].strip()))
-    if not output_filepaths:
-        raise Exception("ERROR: command ran but no output file was detected.")
+        if "[download] 100% of " in line:
+            # NOTE: youtube-dl refers to downloads as 100.0% until the file is completely downloaded.
+            download_successful = True
 
 
 def run_win_cmd(command):
@@ -276,7 +326,8 @@ def run_win_cmd(command):
     # Once the process has completed, get the return code to see if the process was successful.
     return_code = process.wait()
     if return_code != 0:
-        raise Exception('command %s failed, see above for details', command)
+        pass
+        # raise Exception('command %s failed, see above for details', command)
 
 
 def sizeof_fmt(num, suffix='B'):
