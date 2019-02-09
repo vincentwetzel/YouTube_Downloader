@@ -66,7 +66,7 @@ def main():
     for i, output_file in enumerate(google_drive_files):
         google_drive_files[i] = os.path.splitext(os.path.basename(output_file))[0].strip()
 
-    video_titles = get_video_titles(command, google_drive_files)
+    video_titles_list = get_video_titles(command, google_drive_files)
 
     # Output formatting
     print()
@@ -85,7 +85,7 @@ def main():
 
             # Clear any .part files that might be associated with the failed download.
             download_dir_list = os.listdir(download_location)
-            for title in video_titles:
+            for title in video_titles_list:
                 for dir_item in download_dir_list:
                     if title in dir_item:
                         print("Deleting failed download file: " + str(dir_item))
@@ -111,6 +111,9 @@ def main():
                             os.path.join(os.path.dirname(output_file), os.path.basename(f)))
                 output_file_size = os.path.getsize(output_file)
             if output_file_size < 209715200:  # 200 MB
+                move_file = True
+            elif "GSL" in video_titles_list[0] or "ASL" in video_titles_list[0] or "ThePylonShow" in video_titles_list[
+                0]:
                 move_file = True
             else:
                 user_input = input(
@@ -236,18 +239,18 @@ def get_video_titles(command, google_drive_files):
 
     # Set a flag that can be toggled if we need to kill the script.
     redownload_videos = None
-    video_titles = []
+    video_titles_list = []
 
     # Get the video title(s) for the file(s) we are downloading.
     for video_title in run_win_cmd(command):
         video_title = video_title.strip()
 
         # Colons are not valid in file names in Windows so youtube-dl changes them and we must do the same.
-        video_titles.append(video_title.replace(":", " -"))
+        video_titles_list.append(video_title.replace(":", " -"))
 
         # Print the video title(s)
-        print("VIDEO TITLE: " if len(video_titles) == 1 else "VIDEO TITLES: ")
-        print(video_titles[(len(video_titles) - 1)])
+        print("VIDEO TITLE: " if len(video_titles_list) == 1 else "VIDEO TITLES: ")
+        print(video_titles_list[(len(video_titles_list) - 1)])
 
         # If our download already exists, handle the situation.
         if video_title in google_drive_files and redownload_videos is None:
@@ -263,10 +266,10 @@ def get_video_titles(command, google_drive_files):
                 else:
                     print("That didn't work. Please try again.\n")
 
-    for i, s in enumerate(video_titles):
-        video_titles[i] = s.replace("|", "_")
+    for i, s in enumerate(video_titles_list):
+        video_titles_list[i] = s.replace("|", "_")
 
-    return video_titles
+    return video_titles_list
 
 
 def run_youtube_dl_download(command):
