@@ -17,6 +17,8 @@ final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.
 download_location_argument = "-o \"E:\%(title)s.%(ext)s\""
 download_location = os.path.realpath("E:/")
 
+download_playlist_yes = False
+
 youtube_dl_mp4_formats = [137, 136, 398, 22]
 """
 137          mp4        1920x1080  1080p 4752k , avc1.640028, 30fps, video only, 481.99MiB
@@ -44,11 +46,9 @@ def main():
         raise Exception("The value on the clipboard is not a YouTube URL.")
 
     # Strip out extra stuff in URL
-    download_playlist_yes = False
     simplified_youtube_url = check_url_for_extra_parameters(clipboard_youtube_url)
 
-    # Run a command to see if the file already exists and we should skip the download.
-    # NOTE: This will only produce 1 line of output
+    # Get the video title
     if download_playlist_yes:
         command = youtube_dl_loc + " --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
     else:
@@ -75,7 +75,7 @@ def main():
     failed_download_attempts = 0
 
     while True:
-        command = determine_download_command(simplified_youtube_url, download_playlist_yes, failed_download_attempts)
+        command = determine_download_command(simplified_youtube_url, failed_download_attempts)
 
         # Run command to download the file
         run_youtube_dl_download(command)
@@ -145,6 +145,7 @@ def check_url_for_extra_parameters(youtube_url):
     if "&list=" in simplified_youtube_url:
         user_input = input("Do you want to download this whole playlist? (y/n): ")
         if user_input.lower() == "y" or user_input.lower() == "yes":
+            global download_playlist_yes
             download_playlist_yes = True
 
     if "&feature=" in simplified_youtube_url:
@@ -184,12 +185,11 @@ def strip_argument_from_youtube_url(url, argument):
     return "".join([first_half, second_half]) if second_half else first_half
 
 
-def determine_download_command(simplified_youtube_url, download_playlist_yes, failed_download_attempts):
+def determine_download_command(simplified_youtube_url, failed_download_attempts):
     """
     Figures out the correct youtube-dl command to run.
 
     :param simplified_youtube_url:  A YouTube URL with all the extra stuff stripped out of it.
-    :param download_playlist_yes:   A Boolean to determine if the full playlist should be downloaded (if applicable).
     :return:    A string with the correct download command.
     """
     if failed_download_attempts == 0:
@@ -241,6 +241,8 @@ def get_video_titles(command, google_drive_files):
     redownload_videos = None
     video_titles_list = []
 
+    print("VIDEO TITLE: " if len(video_titles_list) == 1 else "VIDEO TITLES: ")
+
     # Get the video title(s) for the file(s) we are downloading.
     for video_title in run_win_cmd(command):
         video_title = video_title.strip()
@@ -249,8 +251,7 @@ def get_video_titles(command, google_drive_files):
         video_titles_list.append(video_title.replace(":", " -"))
 
         # Print the video title(s)
-        print("VIDEO TITLE: " if len(video_titles_list) == 1 else "VIDEO TITLES: ")
-        print(video_titles_list[(len(video_titles_list) - 1)])
+        print(video_title)
 
         # If our download already exists, handle the situation.
         if video_title in google_drive_files and redownload_videos is None:
@@ -265,6 +266,8 @@ def get_video_titles(command, google_drive_files):
                     exit(0)
                 else:
                     print("That didn't work. Please try again.\n")
+
+    print()  # Formatting
 
     for i, s in enumerate(video_titles_list):
         video_titles_list[i] = s.replace("|", "_")
