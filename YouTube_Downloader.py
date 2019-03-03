@@ -112,8 +112,7 @@ def main():
                 output_file_size = os.path.getsize(output_file)
             if output_file_size < 209715200:  # 200 MB
                 move_file_after_download = True
-            elif "GSL" in video_titles_list[0] or "ASL" in video_titles_list[0] or "ThePylonShow" in video_titles_list[
-                0]:
+            elif is_starcraft_video(video_titles_list[0]):
                 move_file_after_download = False
             else:
                 user_input = input(
@@ -351,11 +350,19 @@ def sizeof_fmt(num, suffix='B'):
     return "%.1f%s%s" % (num, 'Yi', suffix)
 
 
-class DataBlocksError(Exception):
+def is_starcraft_video(video_name):
     """
-    This is a custom Exception class to handle situations where youtube-dl fails to get data blocks.
+    This method returns True if a video title is a Starcraft video, False otherwise.
+
+    :param video_name: The name of a YouTube video. This is NOT a URL.
+    :return: True if a video title is a Starcraft video, False otherwise
     """
-    pass
+    starcraft_names = ("GSL", "ASL", "ThePylonShow", "IEM Katowice")
+
+    for name in starcraft_names:
+        if video_name in name:
+            return True
+    return False
 
 
 if __name__ == "__main__":
