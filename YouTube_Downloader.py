@@ -350,17 +350,17 @@ def sizeof_fmt(num, suffix='B'):
     return "%.1f%s%s" % (num, 'Yi', suffix)
 
 
-def is_starcraft_video(video_name):
+def is_starcraft_video(video_title):
     """
     This method returns True if a video title is a Starcraft video, False otherwise.
 
-    :param video_name: The name of a YouTube video. This is NOT a URL.
+    :param video_title: The name of a YouTube video. This is NOT a URL.
     :return: True if a video title is a Starcraft video, False otherwise
     """
-    starcraft_names = ("GSL", "ASL", "ThePylonShow", "IEM Katowice")
+    starcraft_names = ["GSL", "ASL", "ThePylonShow", "IEM Katowice"]
 
-    for name in starcraft_names:
-        if video_name in name:
+    for starcraft_tournament_name in starcraft_names:
+        if starcraft_tournament_name in video_title:
             return True
     return False
 
