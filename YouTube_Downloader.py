@@ -12,7 +12,7 @@ import sys
 # https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
 # https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
 
-youtube_dl_loc = os.path.realpath(os.path.join(str(os.path.expanduser("~")), "youtube-dl.exe"))
+youtube_dl_loc = os.path.realpath(os.path.join("C:\Program Files\Python37\Scripts", "youtube-dl.exe"))
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
 download_location_argument = "-o \"E:\%(title)s.%(ext)s\""
 download_location = os.path.realpath("E:/")
@@ -50,13 +50,13 @@ def main():
 
     # Get the video title
     if download_playlist_yes:
-        command = youtube_dl_loc + " --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
+        command = "\"" + youtube_dl_loc + "\"" + " --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
     else:
         if "&list" in simplified_youtube_url:
-            command = youtube_dl_loc + " --get-title " + strip_argument_from_youtube_url(
+            command = "\"" + youtube_dl_loc + "\"" + " --get-title " + strip_argument_from_youtube_url(
                 simplified_youtube_url, "&list")
         else:
-            command = youtube_dl_loc + " --get-title " + simplified_youtube_url
+            command = "\"" + youtube_dl_loc + "\"" + " --get-title " + simplified_youtube_url
 
     # Output formatting
     print()
@@ -200,7 +200,7 @@ def determine_download_command(simplified_youtube_url, failed_download_attempts)
     else:
         dl_format = ""
 
-    command = youtube_dl_loc + " " + str(dl_format) + " " + download_location_argument + " "
+    command = "\"" + youtube_dl_loc + "\"" + " " + str(dl_format) + " " + download_location_argument + " "
     if len(sys.argv) > 1 and sys.argv[1] == "mp3":
         # Audio downloads
         command += "--extract-audio --audio-format mp3 "
