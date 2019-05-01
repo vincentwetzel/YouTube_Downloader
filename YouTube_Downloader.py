@@ -357,7 +357,7 @@ def is_starcraft_video(video_title):
     :param video_title: The name of a YouTube video. This is NOT a URL.
     :return: True if a video title is a Starcraft video, False otherwise
     """
-    starcraft_names = ["GSL", "ASL", "ThePylonShow", "IEM Katowice"]
+    starcraft_names = ["GSL", "ASL", "KSL", "ThePylonShow", "IEM Katowice"]
 
     for starcraft_tournament_name in starcraft_names:
         if starcraft_tournament_name in video_title:
