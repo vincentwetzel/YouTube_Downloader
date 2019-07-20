@@ -5,6 +5,7 @@ import os
 import shutil
 import re
 import sys
+import collections
 
 # SAMPLE URLS:
 # https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
@@ -27,7 +28,7 @@ youtube_dl_mp4_formats = [137, 136, 398, 22]
 22           mp4        1280x720   hd720 1357k , avc1.64001F, mp4a.40.2@192k (44100Hz) (best)
 """
 
-output_filepaths = []
+output_filepaths = collections.deque([])
 """These are full filepaths for the downloaded file(s).
 This will be used to move the downloaded file(s) to Google Drive"""
 
@@ -292,13 +293,18 @@ def run_youtube_dl_download(command):
         print(line)
         if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
             merge_required = True
-
         if "[download] Destination: " in line and merge_required is False:
             if re.search(r".f[0-9]{3}", line) is not None:
                 merge_required = True
             else:
                 output_filepaths.append(os.path.realpath(line.split("[download] Destination: ")[1]))
         if "[ffmpeg] Merging formats into" in line:
+            raise Exception("Need to figure out why this is here and if a pop is needed")
+            # TODO: I suspect that this is due to merging to/from MKV formats. I'll figure this out later.
+            # TODO: Do we need to modify the merge_required variable? What exactly is the purpose of that variable?
+            output_filepaths.pop()
+
+            # Now add the new converted file
             output_filepaths.append(
                 os.path.realpath(line.split("\"")[1]))  # Index 1 in this will give us the filename.
         if "has already been downloaded" in line:
@@ -307,7 +313,11 @@ def run_youtube_dl_download(command):
         if "[download] 100% of " in line:
             # NOTE: youtube-dl refers to downloads as 100.0% until the file is completely downloaded.
             download_successful = True
-
+        if "[ffmpeg] Destination:" in line:
+            # When files are converted from video to audio
+            # then the original file has to be removed from output_filepaths.
+            output_filepaths.pop()
+            output_filepaths.append(os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip()))
 
 def run_win_cmd(command):
     """
