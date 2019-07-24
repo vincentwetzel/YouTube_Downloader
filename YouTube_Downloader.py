@@ -299,9 +299,7 @@ def run_youtube_dl_download(command):
             else:
                 output_filepaths.append(os.path.realpath(line.split("[download] Destination: ")[1]))
         if "[ffmpeg] Merging formats into" in line:
-            raise Exception("Need to figure out why this is here and if a pop is needed")
-            # TODO: I suspect that this is due to merging to/from MKV formats. I'll figure this out later.
-            # TODO: Do we need to modify the merge_required variable? What exactly is the purpose of that variable?
+            # sometimes files are downloaded in MP4 and converted into MKV or things like that.
             output_filepaths.pop()
 
             # Now add the new converted file
