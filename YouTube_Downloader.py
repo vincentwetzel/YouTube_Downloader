@@ -13,7 +13,7 @@ import collections
 # https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
 # https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
 
-youtube_dl_loc = "youtube-dl"   # TODO: Remove this variable from script. It should be in the PATH.
+youtube_dl_loc = "youtube-dl"  # TODO: Remove this variable from script. It should be in the PATH.
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
 download_location_argument = "-o \"E:\%(title)s.%(ext)s\""
 download_location = os.path.realpath("E:/")
@@ -116,14 +116,19 @@ def main():
             elif is_starcraft_video(video_titles_list[0]):
                 move_file_after_download = False
             else:
-                user_input = input(
-                    str(output_file) + " is " + sizeof_fmt(
-                        output_file_size) + ". Do you still want to move it to " + str(
-                        final_destination_dir) + "?(y/n)").lower()
-                if user_input == "y" or user_input == "yes":
-                    move_file_after_download = True
-                else:
-                    move_file_after_download = False
+                while True:
+                    user_input = input(
+                        str(output_file) + " is " + sizeof_fmt(
+                            output_file_size) + ". Do you still want to move it to " + str(
+                            final_destination_dir) + "?(y/n)").strip().lower()
+                    if user_input == "y" or user_input == "yes":
+                        move_file_after_download = True
+                        break
+                    elif user_input == "n" or user_input == "no":
+                        move_file_after_download = False
+                        break
+                    else:
+                        print("That didn't work. Please try again.")
             if move_file_after_download:
                 # Use shutil to make sure the file is replaced if it already exists.
                 shutil.move(output_file, os.path.join(final_destination_dir, os.path.basename(output_file)))
@@ -140,7 +145,7 @@ def check_url_for_extra_parameters(youtube_url):
     :param youtube_url: A YouTube URL
     :return:    A simplified version of the input URL
     """
-    # TODO: Make this better using regex
+    # TODO: Replace this whole damn thing by adding quotes to input command
     simplified_youtube_url = youtube_url
     if "&list=" in simplified_youtube_url:
         user_input = input("Do you want to download this whole playlist? (y/n): ")
@@ -317,6 +322,7 @@ def run_youtube_dl_download(command):
             output_filepaths.pop()
             output_filepaths.append(os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip()))
 
+
 def run_win_cmd(command):
     """
     Runs a command in a new cmd window.
@@ -365,10 +371,10 @@ def is_starcraft_video(video_title):
     :param video_title: The name of a YouTube video. This is NOT a URL.
     :return: True if a video title is a Starcraft video, False otherwise
     """
-    starcraft_names = ["GSL", "ASL", "KSL", "ThePylonShow", "IEM Katowice"]
+    starcraft_tournament_names = ["GSL", "WCS", "ASL", "KSL", "ThePylonShow", "IEM Katowice"]
 
-    for starcraft_tournament_name in starcraft_names:
-        if starcraft_tournament_name in video_title:
+    for tournament in starcraft_tournament_names:
+        if tournament in video_title:
             return True
     return False
 
