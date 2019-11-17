@@ -40,22 +40,22 @@ download_successful = False
 def main():
     # Dump clipboard data into a variable
     win32clipboard.OpenClipboard()
-    clipboard_youtube_url = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
+    original_youtube_url = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
         "utf-8"))  # must decode from bytes to string
     win32clipboard.CloseClipboard()
-    if (clipboard_youtube_url.startswith(
-            "https://www.youtube.com/watch?") is False and clipboard_youtube_url.startswith(
-        "https://youtu.be/") is False) or " " in clipboard_youtube_url:
+    if (original_youtube_url.startswith(
+            "https://www.youtube.com/watch?") is False and original_youtube_url.startswith(
+        "https://youtu.be/") is False) or " " in original_youtube_url:
         raise Exception("The value on the clipboard is not a YouTube URL.")
 
     # Strip out extra stuff in URL
-    simplified_youtube_url = check_url_for_extra_parameters(clipboard_youtube_url)
+    check_to_see_if_playlist(original_youtube_url)
 
     # Get the video title
     if download_playlist_yes:
-        dl_command = "youtube-dl --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
+        dl_command = "youtube-dl --get-title -i --yes-playlist \"" + original_youtube_url + "\""
     else:
-        dl_command = "youtube-dl --get-title " + simplified_youtube_url
+        dl_command = "youtube-dl --get-title \"" + original_youtube_url + "\""
 
     # Output formatting
     print()
@@ -74,7 +74,7 @@ def main():
     failed_download_attempts = 0
 
     while True:
-        dl_command = determine_download_command(simplified_youtube_url, failed_download_attempts)
+        dl_command = determine_download_command(original_youtube_url, failed_download_attempts)
 
         # Run command to download the file
         run_youtube_dl_download(dl_command)
@@ -134,7 +134,7 @@ def main():
     # Done!
 
 
-def check_url_for_extra_parameters(youtube_url):
+def check_to_see_if_playlist(youtube_url):
     """
     Strips a YouTube URL down to its most basic form.
     If the URL is for a playlist then this method has an option to retain that.
@@ -142,8 +142,7 @@ def check_url_for_extra_parameters(youtube_url):
     :param youtube_url: A YouTube URL
     :return:    A simplified version of the input URL
     """
-    simplified_youtube_url = youtube_url
-    if "list=" in simplified_youtube_url:
+    if "list=" in youtube_url:
         while True:
             user_input = input("Do you want to download this whole playlist? (y/n): ").lower()
             if user_input == "y" or user_input == "yes":
@@ -154,7 +153,6 @@ def check_url_for_extra_parameters(youtube_url):
                 break
             else:
                 print("That didn't work. Plese try again.")
-    return simplified_youtube_url
 
 
 def determine_download_command(simplified_youtube_url, failed_download_attempts):
