@@ -281,6 +281,9 @@ def run_youtube_dl_download(command):
             # then the original file has to be removed from output_filepaths.
             output_filepaths.pop()
             output_filepaths.append(os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip()))
+        if "WARNING: Unable to extract video title" in line:
+            raise Exception("There is an issue with trying to download this video. You may need to update youtube-dl")
+            input("Press any key to exit this script...")
 
 
 def run_win_cmd(command):
