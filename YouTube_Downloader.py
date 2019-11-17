@@ -155,11 +155,11 @@ def check_to_see_if_playlist(youtube_url):
                 print("That didn't work. Plese try again.")
 
 
-def determine_download_command(simplified_youtube_url, failed_download_attempts):
+def determine_download_command(youtube_url, failed_download_attempts):
     """
     Figures out the correct youtube-dl command to run.
 
-    :param simplified_youtube_url:  A YouTube URL with all the extra stuff stripped out of it.
+    :param youtube_url:  A YouTube URL.
     :return:    A string with the correct download command.
     """
     if failed_download_attempts == 0:
@@ -177,16 +177,16 @@ def determine_download_command(simplified_youtube_url, failed_download_attempts)
         # Audio downloads
         command += "--extract-audio --audio-format mp3 "
         if download_playlist_yes:
-            command += "--yes-playlist \"" + simplified_youtube_url + "\""
+            command += "--yes-playlist \"" + youtube_url + "\""
         else:
-            command += "\"" + simplified_youtube_url + "\""
+            command += "\"" + youtube_url + "\""
     else:
         # Video downloads
         if download_playlist_yes:
             # Video playlists
-            command += "--yes-playlist \"" + simplified_youtube_url + "\""
+            command += "--yes-playlist \"" + youtube_url + "\""
         else:
-            command += "\"" + simplified_youtube_url + "\""
+            command += "\"" + youtube_url + "\""
 
     command += " && exit"
     return command
