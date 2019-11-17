@@ -1,3 +1,6 @@
+# NOTE: youtube-dl must be in the system PATH for this to run.
+# I recommend installing youtube-dl with PIP, including on Windows.
+
 import win32clipboard
 import subprocess
 import win32con
@@ -13,7 +16,6 @@ import collections
 # https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
 # https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
 
-youtube_dl_loc = "youtube-dl"  # TODO: Remove this variable from script. It should be in the PATH.
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
 download_location_argument = "-o \"E:\%(title)s.%(ext)s\""
 download_location = os.path.realpath("E:/")
@@ -51,13 +53,9 @@ def main():
 
     # Get the video title
     if download_playlist_yes:
-        command = youtube_dl_loc + " --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
+        dl_command = "youtube-dl --get-title -i --yes-playlist \"" + simplified_youtube_url + "\""
     else:
-        if "&list" in simplified_youtube_url:
-            command = youtube_dl_loc + " --get-title " + strip_argument_from_youtube_url(
-                simplified_youtube_url, "&list")
-        else:
-            command = youtube_dl_loc + " --get-title " + simplified_youtube_url
+        dl_command = "youtube-dl --get-title " + simplified_youtube_url
 
     # Output formatting
     print()
@@ -67,7 +65,7 @@ def main():
     for i, output_file in enumerate(google_drive_files):
         google_drive_files[i] = os.path.splitext(os.path.basename(output_file))[0].strip()
 
-    video_titles_list = get_video_titles(command, google_drive_files)
+    video_titles_list = get_video_titles(dl_command, google_drive_files)
 
     # Output formatting
     print()
@@ -76,10 +74,10 @@ def main():
     failed_download_attempts = 0
 
     while True:
-        command = determine_download_command(simplified_youtube_url, failed_download_attempts)
+        dl_command = determine_download_command(simplified_youtube_url, failed_download_attempts)
 
         # Run command to download the file
-        run_youtube_dl_download(command)
+        run_youtube_dl_download(dl_command)
         if not download_successful:
             print("Download attempt #" + str(failed_download_attempts + 1) + " failed.")
             failed_download_attempts += 1
@@ -108,8 +106,7 @@ def main():
                 start_of_file_name = re.search(r".+?(?=�)", os.path.basename(output_file)).group(0)
                 for f in os.listdir(os.path.dirname(output_file)):
                     if os.path.basename(f).startswith(start_of_file_name):
-                        output_file = os.path.realpath(
-                            os.path.join(os.path.dirname(output_file), os.path.basename(f)))
+                        output_file = os.path.realpath(os.path.join(os.path.dirname(output_file), os.path.basename(f)))
                 output_file_size = os.path.getsize(output_file)
             if output_file_size < 209715200:  # 200 MB
                 move_file_after_download = True
@@ -128,7 +125,7 @@ def main():
                         move_file_after_download = False
                         break
                     else:
-                        print("That didn't work. Please try again.")
+                        print("That didn't work. Please try again.\n")
             if move_file_after_download:
                 # Use shutil to make sure the file is replaced if it already exists.
                 shutil.move(output_file, os.path.join(final_destination_dir, os.path.basename(output_file)))
@@ -145,49 +142,19 @@ def check_url_for_extra_parameters(youtube_url):
     :param youtube_url: A YouTube URL
     :return:    A simplified version of the input URL
     """
-    # TODO: Replace this whole damn thing by adding quotes to input command
     simplified_youtube_url = youtube_url
-    if "&list=" in simplified_youtube_url:
-        user_input = input("Do you want to download this whole playlist? (y/n): ")
-        if user_input.lower() == "y" or user_input.lower() == "yes":
-            global download_playlist_yes
-            download_playlist_yes = True
-
-    if "&feature=" in simplified_youtube_url:
-        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "&feature")
-    if "?t=" in simplified_youtube_url:
-        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "?t=")
-    if "&t=" in simplified_youtube_url:
-        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "&t")
-    if "time_continue" in simplified_youtube_url:
-        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "time_continue")
-    if "&index" in simplified_youtube_url:
-        simplified_youtube_url = strip_argument_from_youtube_url(simplified_youtube_url, "&index")
-
+    if "list=" in simplified_youtube_url:
+        while True:
+            user_input = input("Do you want to download this whole playlist? (y/n): ").lower()
+            if user_input == "y" or user_input == "yes":
+                global download_playlist_yes
+                download_playlist_yes = True
+                break
+            elif user_input.lower() == "n" or user_input == "no":
+                break
+            else:
+                print("That didn't work. Plese try again.")
     return simplified_youtube_url
-
-
-def strip_argument_from_youtube_url(url, argument):
-    """
-    This strips an argument out of a YouTube URL.
-
-    :param url:     A full youtube URL.
-    :param argument:    The parameter to strip out.
-                        If you need to strip out an '&' symbol then that MUST be included when passing it to this method.
-    :return:    The URL without the argument.
-    """
-
-    first_search = r".+?(?=" + argument + r")"
-    first_half = re.search(first_search, url).group(0)
-
-    # NOTE: Sometimes the 2nd half will be empty (None)
-    # EXAMPLE: https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
-    second_search = r"(?<=" + argument + r"=).*&(.*)"
-    second_half = None
-    if re.search(second_search, url) is not None:
-        second_half = re.search(second_search, url).group(0)
-
-    return "".join([first_half, second_half]) if second_half else first_half
 
 
 def determine_download_command(simplified_youtube_url, failed_download_attempts):
@@ -206,7 +173,8 @@ def determine_download_command(simplified_youtube_url, failed_download_attempts)
     else:
         dl_format = ""
 
-    command = youtube_dl_loc + " " + str(dl_format) + " " + download_location_argument + " "
+    # NOTE: use --restrict-filenames to prevent emojis and weird stuff from being in the output file's name.
+    command = "youtube-dl --restrict-filenames " + str(dl_format) + " " + download_location_argument + " "
     if len(sys.argv) > 1 and sys.argv[1] == "mp3":
         # Audio downloads
         command += "--extract-audio --audio-format mp3 "
@@ -220,13 +188,7 @@ def determine_download_command(simplified_youtube_url, failed_download_attempts)
             # Video playlists
             command += "--yes-playlist \"" + simplified_youtube_url + "\""
         else:
-            if "&list" in simplified_youtube_url:
-                # Normal video with playlist in URL
-                command += strip_argument_from_youtube_url(
-                    simplified_youtube_url, "&list")
-            else:
-                # Normal video
-                command += simplified_youtube_url
+            command += simplified_youtube_url
 
     command += " && exit"
     return command
