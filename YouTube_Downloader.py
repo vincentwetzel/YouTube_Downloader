@@ -179,14 +179,14 @@ def determine_download_command(simplified_youtube_url, failed_download_attempts)
         if download_playlist_yes:
             command += "--yes-playlist \"" + simplified_youtube_url + "\""
         else:
-            command += simplified_youtube_url
+            command += "\"" + simplified_youtube_url + "\""
     else:
         # Video downloads
         if download_playlist_yes:
             # Video playlists
             command += "--yes-playlist \"" + simplified_youtube_url + "\""
         else:
-            command += simplified_youtube_url
+            command += "\"" + simplified_youtube_url + "\""
 
     command += " && exit"
     return command
