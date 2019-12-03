@@ -5,6 +5,8 @@ import win32clipboard
 import subprocess
 import win32con
 import os
+import platform
+import ctypes
 import shutil
 import re
 import sys
@@ -19,6 +21,8 @@ import collections
 final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
 download_location_argument = "-o \"E:\%(title)s.%(ext)s\""
 download_location = os.path.realpath("E:/")
+
+video_titles_list = []
 
 download_playlist_yes = False
 
@@ -51,20 +55,21 @@ def main():
     # Strip out extra stuff in URL
     check_to_see_if_playlist(original_youtube_url)
 
+    # Output formatting
+    print()
+
     # Get the video title
     if download_playlist_yes:
         dl_command = "youtube-dl --get-title -i --yes-playlist \"" + original_youtube_url + "\""
     else:
         dl_command = "youtube-dl --get-title \"" + original_youtube_url + "\""
 
-    # Output formatting
-    print()
-
     # Get a list of the files in the final output directory
     google_drive_files = os.listdir(final_destination_dir)
     for i, output_file in enumerate(google_drive_files):
         google_drive_files[i] = os.path.splitext(os.path.basename(output_file))[0].strip()
 
+    global video_titles_list
     video_titles_list = get_video_titles(dl_command, google_drive_files)
 
     # Output formatting
@@ -299,6 +304,10 @@ def run_win_cmd(command):
     # Note: errors="ignore" ignores special characters and returns the string without them.
     process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, errors="replace")
+
+    # Rename the console window to reflect the video's title
+    if platform.system() == "Windows" and len(video_titles_list) == 1:
+        os.system("title " + video_titles_list[0])
 
     # Yield stderr lines first so there aren't blank stdout lines fumbling around in the generator
     # and stderr issues can be handled immediately.
