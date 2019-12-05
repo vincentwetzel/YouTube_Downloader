@@ -176,8 +176,7 @@ def determine_download_command(youtube_url, failed_download_attempts):
     else:
         dl_format = ""
 
-    # NOTE: use --restrict-filenames to prevent emojis and weird stuff from being in the output file's name.
-    command = "youtube-dl --restrict-filenames " + str(dl_format) + " " + download_location_argument + " "
+    command = "youtube-dl " + str(dl_format) + " " + download_location_argument + " "
     if len(sys.argv) > 1 and sys.argv[1] == "mp3":
         # Audio downloads
         command += "--extract-audio --audio-format mp3 "
@@ -207,9 +206,10 @@ def get_video_titles(command, google_drive_files):
     :return:    The title(s) of the video(s) to be downloaded as a list.
     """
 
+    video_titles_list = []
+
     # Set a flag that can be toggled if we need to kill the script.
     redownload_videos = None
-    video_titles_list = []
 
     print("VIDEO TITLE: " if len(video_titles_list) == 1 else "VIDEO TITLES: ")
 
@@ -218,7 +218,7 @@ def get_video_titles(command, google_drive_files):
         video_title = video_title.strip()
 
         # Colons are not valid in file names in Windows so youtube-dl changes them and we must do the same.
-        video_titles_list.append(video_title.replace(":", " -"))
+        video_titles_list.append(video_title.replace(":", "-"))
 
         # Print the video title(s)
         print(video_title)
@@ -240,7 +240,9 @@ def get_video_titles(command, google_drive_files):
     print()  # Formatting
 
     for i, s in enumerate(video_titles_list):
+        print("s before: " + s)
         video_titles_list[i] = s.replace("|", "_")
+        print("s after: " + s.replace("|", "_"))
 
     return video_titles_list
 
