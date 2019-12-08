@@ -240,9 +240,7 @@ def get_video_titles(command, google_drive_files):
     print()  # Formatting
 
     for i, s in enumerate(video_titles_list):
-        print("s before: " + s)
         video_titles_list[i] = s.replace("|", "_")
-        print("s after: " + s.replace("|", "_"))
 
     return video_titles_list
 
