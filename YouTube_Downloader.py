@@ -6,23 +6,24 @@ import subprocess
 import win32con
 import os
 import platform
-import ctypes
 import shutil
 import re
 import sys
 import collections
+import tkinter
+import tkinter.ttk
+import tkinter.messagebox
+import logging
+import threading
 
-# SAMPLE URLS:
-# https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
-# https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
-# https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
-# https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
+# NOTE TO USER: use logging.DEBUG for testing, logging.CRITICAL for runtime
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
-final_destination_dir = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
-download_location_argument = "-o \"E:\%(title)s.%(ext)s\""
-download_location = os.path.realpath("E:/")
+FINAL_DESTINATION_DIR = os.path.realpath("E:/Google Drive (vincentwetzel3@gmail.com)")
+DOWNLOAD_LOCATION_ARGUMENT = "-o \"E:\%(title)s.%(ext)s\""  # TODO: Initialize this from settings.ini
+DOWNLOAD_LOCATION = os.path.realpath("E:/")
 
-video_titles_list = []
+MAXIMUM_SIMULTANEOUS_DOWNLOADS = 3  # TODO: Make a dropdown box to control this number
 
 download_playlist_yes = False
 
@@ -38,62 +39,71 @@ output_filepaths = collections.deque([])
 """These are full filepaths for the downloaded file(s).
 This will be used to move the downloaded file(s) to Google Drive"""
 
-download_successful = False
 
+# SAMPLE URLS:
+# https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
+# https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
+# https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
+# https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
 
 def main():
+    root_tk = tkinter.Tk()
+    root_tk.title("YouTube Downloader by Vincent Wetzel")
+    frame_1 = tkinter.ttk.Frame(root_tk, padding="3 3 12 12")
+
+    # Download button
+    tkinter.ttk.Button(frame_1, text="Button!", command=lambda: init_download()).grid(column=0, row=0,
+                                                                                      sticky='W')
+    frame_1.grid()
+    root_tk.mainloop()
+
+    # Done!
+
+
+def init_download():
     # Dump clipboard data into a variable
     win32clipboard.OpenClipboard()
-    original_youtube_url = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
+    raw_url = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
         "utf-8"))  # must decode from bytes to string
     win32clipboard.CloseClipboard()
-    if (original_youtube_url.startswith(
-            "https://www.youtube.com/watch?") is False and original_youtube_url.startswith(
-        "https://youtu.be/") is False) or " " in original_youtube_url:
+    if (raw_url.startswith("https://www.youtube.com/watch?") is False and raw_url.startswith(
+            "https://youtu.be/") is False) or " " in raw_url:
         raise Exception("The value on the clipboard is not a YouTube URL.")
 
-    # Strip out extra stuff in URL
-    check_to_see_if_playlist(original_youtube_url)
-
-    # Output formatting
-    print()
-
     # Get the video title
-    if download_playlist_yes:
-        dl_command = "youtube-dl --get-title -i --yes-playlist \"" + original_youtube_url + "\""
+    if check_to_see_if_playlist(raw_url):
+        global download_playlist_yes
+        download_playlist_yes = True  # TODO: Make this more eloquent
+        dl_command = "youtube-dl --get-title -i --yes-playlist \"" + raw_url + "\""
     else:
-        dl_command = "youtube-dl --get-title \"" + original_youtube_url + "\""
+        dl_command = "youtube-dl --get-title \"" + raw_url + "\""
 
     # Get a list of the files in the final output directory
-    google_drive_files = os.listdir(final_destination_dir)
-    for i, output_file in enumerate(google_drive_files):
-        google_drive_files[i] = os.path.splitext(os.path.basename(output_file))[0].strip()
+    google_drive_files = os.listdir(FINAL_DESTINATION_DIR)
+    for idx, output_file in enumerate(google_drive_files):
+        google_drive_files[idx] = os.path.splitext(os.path.basename(output_file))[0].strip()
 
-    global video_titles_list
     video_titles_list = get_video_titles(dl_command, google_drive_files)
-
-    # Output formatting
-    print()
 
     # Track failed download attempts so we can modify the youtube-dl command as needed.
     failed_download_attempts = 0
 
     while True:
-        dl_command = determine_download_command(original_youtube_url, failed_download_attempts)
+        dl_command = determine_download_command(raw_url, failed_download_attempts)
 
         # Run command to download the file
-        run_youtube_dl_download(dl_command)
-        if not download_successful:
-            print("Download attempt #" + str(failed_download_attempts + 1) + " failed.")
+        result_successful = run_youtube_dl_download(dl_command)
+        if not result_successful:
+            logging.debug("Download attempt #" + str(failed_download_attempts + 1) + " failed.")
             failed_download_attempts += 1
 
             # Clear any .part files that might be associated with the failed download.
-            download_dir_list = os.listdir(download_location)
+            download_dir_list = os.listdir(DOWNLOAD_LOCATION)
             for title in video_titles_list:
                 for dir_item in download_dir_list:
                     if title in dir_item:
-                        print("Deleting failed download file: " + str(dir_item))
-                        os.remove(os.path.join(download_location, dir_item))
+                        logging.debug("Deleting failed download file: " + str(dir_item))
+                        os.remove(os.path.join(DOWNLOAD_LOCATION, dir_item))
 
         else:
             break
@@ -111,32 +121,24 @@ def main():
                 start_of_file_name = re.search(r".+?(?=�)", os.path.basename(output_file)).group(0)
                 for f in os.listdir(os.path.dirname(output_file)):
                     if os.path.basename(f).startswith(start_of_file_name):
-                        output_file = os.path.realpath(os.path.join(os.path.dirname(output_file), os.path.basename(f)))
+                        output_file = os.path.realpath(
+                            os.path.join(os.path.dirname(output_file), os.path.basename(f)))
                 output_file_size = os.path.getsize(output_file)
+
+            # TODO: Modify this with a dropdown box.
             if output_file_size < 209715200:  # 200 MB
                 move_file_after_download = True
-            elif is_starcraft_video(video_titles_list[0]):
+            elif is_video_not_to_move(video_titles_list[0]):
                 move_file_after_download = False
             else:
-                while True:
-                    user_input = input(
-                        str(output_file) + " is " + sizeof_fmt(
-                            output_file_size) + ". Do you still want to move it to " + str(
-                            final_destination_dir) + "?(y/n)").strip().lower()
-                    if user_input == "y" or user_input == "yes":
-                        move_file_after_download = True
-                        break
-                    elif user_input == "n" or user_input == "no":
-                        move_file_after_download = False
-                        break
-                    else:
-                        print("That didn't work. Please try again.\n")
+                move_file_after_download = tkinter.messagebox(title="Move File?",
+                                                              message=str(output_file) + " is " + sizeof_fmt(
+                                                                  output_file_size) + ". Do you still want to move it to " + str(
+                                                                  FINAL_DESTINATION_DIR) + "?(y/n)")
             if move_file_after_download:
                 # Use shutil to make sure the file is replaced if it already exists.
-                shutil.move(output_file, os.path.join(final_destination_dir, os.path.basename(output_file)))
-                print("\n" + str(output_file) + " moved to directory " + str(final_destination_dir))
-
-    # Done!
+                shutil.move(output_file, os.path.join(FINAL_DESTINATION_DIR, os.path.basename(output_file)))
+                logging.debug("\n" + str(output_file) + " moved to directory " + str(FINAL_DESTINATION_DIR))
 
 
 def check_to_see_if_playlist(youtube_url):
@@ -148,25 +150,20 @@ def check_to_see_if_playlist(youtube_url):
     :return:    A simplified version of the input URL
     """
     if "list=" in youtube_url:
-        while True:
-            user_input = input("Do you want to download this whole playlist? (y/n): ").lower()
-            if user_input == "y" or user_input == "yes":
-                global download_playlist_yes
-                download_playlist_yes = True
-                break
-            elif user_input.lower() == "n" or user_input == "no":
-                break
-            else:
-                print("That didn't work. Plese try again.")
+        return tkinter.messagebox.askyesno(title="Download Playlist",
+                                           message="Do you want to download this entire playlist?")
+    else:
+        return False
 
 
-def determine_download_command(youtube_url, failed_download_attempts):
+def determine_download_command(youtube_url, failed_download_attempts, download_mp3=False):
     """
     Figures out the correct youtube-dl command to run.
 
     :param youtube_url:  A YouTube URL.
     :return:    A string with the correct download command.
     """
+    # TODO: Verify this
     if failed_download_attempts == 0:
         dl_format = "-f best[ext=mp4]/best"
     elif failed_download_attempts == 1:
@@ -176,8 +173,8 @@ def determine_download_command(youtube_url, failed_download_attempts):
     else:
         dl_format = ""
 
-    command = "youtube-dl " + str(dl_format) + " " + download_location_argument + " "
-    if len(sys.argv) > 1 and sys.argv[1] == "mp3":
+    command = "youtube-dl " + str(dl_format) + " " + DOWNLOAD_LOCATION_ARGUMENT + " "
+    if download_mp3:
         # Audio downloads
         command += "--extract-audio --audio-format mp3 "
         if download_playlist_yes:
@@ -211,7 +208,7 @@ def get_video_titles(command, google_drive_files):
     # Set a flag that can be toggled if we need to kill the script.
     redownload_videos = None
 
-    print("VIDEO TITLE: " if len(video_titles_list) == 1 else "VIDEO TITLES: ")
+    logging.debug("VIDEO TITLE: " if len(video_titles_list) == 1 else "VIDEO TITLES: ")
 
     # Get the video title(s) for the file(s) we are downloading.
     for video_title in run_win_cmd(command):
@@ -221,23 +218,15 @@ def get_video_titles(command, google_drive_files):
         video_titles_list.append(video_title.replace(":", "-"))
 
         # Print the video title(s)
-        print(video_title)
+        logging.debug(video_title)
 
         # If our download already exists, handle the situation.
         if video_title in google_drive_files and redownload_videos is None:
-            while True:
-                choice = input("We have detected that this file has already been downloaded to " + str(
-                    final_destination_dir) + ". Do you want to download it again? (y/n)").lower()
-                if choice == "y" or choice == "yes":
-                    redownload_videos = True
-                    break  # Continue running the script in the normal way as if none of this happened.
-                elif choice == "n" or choice == "no":
-                    print("\nThis script will now terminate.")
-                    exit(0)
-                else:
-                    print("That didn't work. Please try again.\n")
+            redownload_videos = tkinter.messagebox.askyesno(title="File is already downloaded",
+                                                            message="We have detected that this file has already been downloaded to " + str(
+                                                                FINAL_DESTINATION_DIR) + ". Do you want to download it again?")
 
-    print()  # Formatting
+    logging.debug('\n')  # Formatting
 
     for i, s in enumerate(video_titles_list):
         video_titles_list[i] = s.replace("|", "_")
@@ -253,14 +242,13 @@ def run_youtube_dl_download(command):
     :param command: A youtube-dl command to download a video from a YouTube URL.
     :return:    None
     """
-    global download_successful
+
+    merge_required = False  # TODO: What is this variable for?
     download_successful = False
 
-    merge_required = False
-    global output_filepaths
     for line in run_win_cmd(command):
         line = line.strip()  # Strip off \n from each line
-        print(line)
+        logging.debug(line)
         if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
             merge_required = True
         if "[download] Destination: " in line and merge_required is False:
@@ -287,8 +275,10 @@ def run_youtube_dl_download(command):
             output_filepaths.pop()
             output_filepaths.append(os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip()))
         if "WARNING: Unable to extract video title" in line:
-            raise Exception("There is an issue with trying to download this video. You may need to update youtube-dl")
+            # TODO: Handle this properly
+            logging.debug("There is an issue with trying to download this video. You may need to update youtube-dl")
             input("Press any key to exit this script...")
+    return download_successful
 
 
 def run_win_cmd(command):
@@ -300,14 +290,10 @@ def run_win_cmd(command):
     :param command: The command to run.
     """
 
-    print(str(command) + "\n")
+    logging.debug(str(command) + "\n")
     # Note: errors="ignore" ignores special characters and returns the string without them.
     process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, errors="replace")
-
-    # Rename the console window to reflect the video's title
-    if platform.system() == "Windows" and len(video_titles_list) == 1:
-        os.system("title " + video_titles_list[0])
 
     # Yield stderr lines first so there aren't blank stdout lines fumbling around in the generator
     # and stderr issues can be handled immediately.
@@ -317,8 +303,7 @@ def run_win_cmd(command):
     # Once the process has completed, get the return code to see if the process was successful.
     return_code = process.wait()
     if return_code != 0:
-        pass
-        # raise Exception('command %s failed, see above for details', command)
+        raise Exception('command %s failed, see above for details', command)
 
 
 def sizeof_fmt(num, suffix='B'):
@@ -336,9 +321,10 @@ def sizeof_fmt(num, suffix='B'):
     return "%.1f%s%s" % (num, 'Yi', suffix)
 
 
-def is_starcraft_video(video_title):
+def is_video_not_to_move(video_title):
+    # TODO: Update documentation here. Output folders and final destination folders should be held in settings.ini
     """
-    This method returns True if a video title is a Starcraft video, False otherwise.
+    Determines if the video is a special case that should NOT be moved to Google Drive after downloading.
 
     :param video_title: The name of a YouTube video. This is NOT a URL.
     :return: True if a video title is a Starcraft video, False otherwise
@@ -348,6 +334,10 @@ def is_starcraft_video(video_title):
     for tournament in starcraft_tournament_names:
         if tournament in video_title:
             return True
+
+    if "Bannon's War Room" in video_title:
+        return True
+
     return False
 
 
