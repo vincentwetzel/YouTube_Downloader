@@ -49,6 +49,9 @@ download_names: List[tkinter.StringVar] = list()
 downloads_queue: deque = deque()
 download_objs_list: List[YouTubeDownloader] = list()
 
+download_type: tkinter.StringVar = None
+"""False is MP4, True is mp3"""
+
 progress_bars_list: List[tkinter.ttk.Progressbar] = list()
 download_names_labels_list: List[str] = list()
 
@@ -136,8 +139,10 @@ def start_download_thread() -> None:
 
     global COMPLETED_DOWNLOADS_DIR
     global DOWNLOAD_TEMP_LOC
+    global download_type
     download_obj = YouTubeDownloader(url, DOWNLOAD_TEMP_LOC,
-                                     COMPLETED_DOWNLOADS_DIR)  # TODO: Add mp3 handling here via ComboBox
+                                     COMPLETED_DOWNLOADS_DIR,
+                                     False if download_type == "Video" else True)
     global download_objs_list
     download_objs_list.append(download_obj)
     threads.append(threading.Thread(target=download_obj.run_yt_download))
@@ -250,12 +255,12 @@ def init_gui():
 
     # Text box
     download_urls_textVar = tkinter.Text(frames[0], width=50, height=5)
-    download_urls_textVar.grid(column=0, row=0, sticky=(tkinter.W, tkinter.N, tkinter.S), columnspan=4)
+    download_urls_textVar.grid(column=0, row=0, sticky=(tkinter.W, tkinter.N, tkinter.S), columnspan=11)
     download_urls_textVar.bind('<FocusIn>', lambda _: download_text_var_selected(download_urls_textVar))
 
     # Download button
     tkinter.ttk.Button(frames[0], text="Download",
-                       command=lambda: add_dls_to_queue(download_urls_textVar.get(1.0, "end").strip())).grid(column=10,
+                       command=lambda: add_dls_to_queue(download_urls_textVar.get(1.0, "end").strip())).grid(column=11,
                                                                                                              row=0,
                                                                                                              sticky=(
                                                                                                                  tkinter.E,
@@ -271,6 +276,15 @@ def init_gui():
                                     values=[1, 2, 3, 4])
     combobox.set(2)
     combobox.grid(column=1, row=10, sticky=('W',))
+
+    tkinter.ttk.Label(frames[0], text="Download type: ").grid(column=10, row=10,
+                                                              sticky=(tkinter.E))
+    global download_type
+    download_type = tkinter.StringVar(value="Video")
+    tkinter.Radiobutton(frames[0], text="Video", variable=download_type, value="Video").grid(column=11, row=10,
+                                                                                             sticky=(tkinter.W))
+    tkinter.Radiobutton(frames[0], text="Audio", variable=download_type, value="Audio").grid(column=11, row=11,
+                                                                                             sticky=(tkinter.W))
 
 
 def init_settings():
@@ -320,12 +334,12 @@ def init_settings():
         DOWNLOAD_TEMP_LOC = tkinter.filedialog.askdirectory(
             title="Choose a temporary directory for ongoing downloads")
 
-
     if need_to_rewrite_settings_ini:
         logging.debug("Rewriting settings.ini...")
         with open("settings.ini", 'w') as newfile:
             newfile.write("completed_downloads_directory=" + COMPLETED_DOWNLOADS_DIR + "\n")
             newfile.write("temporary_downloads_directory=" + DOWNLOAD_TEMP_LOC)
+
 
 if __name__ == "__main__":
     main()
