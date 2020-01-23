@@ -1,6 +1,6 @@
 @echo off
 
-python %~dp0\Youtube_Downloader.py
+python %~dp0\YouTubeDownloaderApp.py
 
 ::pause
 exit

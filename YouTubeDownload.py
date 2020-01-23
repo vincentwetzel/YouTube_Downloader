@@ -22,7 +22,7 @@ class YouTubeDownloader:
         self.TEMP_DOWNLOAD_LOC = temp_dl_loc
         self.output_dir_files = os.listdir(
             self.FINAL_DESTINATION_DIR)
-        self.video_title: tkinter.StringVar = tkinter.StringVar(value=self.get_video_title())
+        self.video_title: tkinter.StringVar = tkinter.StringVar(value=self.raw_url)
         self.download_mp3 = download_mp3
         self.failed_download_attempts = 0
         self.output_file_path = None
@@ -47,7 +47,9 @@ class YouTubeDownloader:
         This is the main download method.
         :return: True if successful, false otherwise.
         """
-        if not self.redownload_video:
+        self.video_title.set(self.get_video_title())
+
+        if not self.redownload_video and self.redownload_video is not None:
             return
         while True:
             download_command = self.determine_download_command()
@@ -197,7 +199,6 @@ class YouTubeDownloader:
                 self.output_file_path = os.path.realpath(
                     line.split("\"")[1])  # Index 1 in this will give us the filename.
             if "has already been downloaded" in line:
-                logging.debug("Has been downloaded case!!!")
                 logging.debug("LINE:" + line)
                 logging.debug(
                     "LINE AFTER SPLIT:" + line.split("[download]")[1].strip().split(" has already")[0].strip())
