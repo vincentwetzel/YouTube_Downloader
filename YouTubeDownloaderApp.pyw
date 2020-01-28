@@ -96,7 +96,22 @@ class YouTubeDownloaderApp:
                     self.add_dls_to_queue("https://www.youtube.com/watch?v=" + match)
                 return
 
-        self.downloads_queue.append(url)
+        download_obj = YouTubeDownloader(url, self.DOWNLOAD_TEMP_LOC,
+                                         self.COMPLETED_DOWNLOADS_DIR,
+                                         False if self.download_type.get() == "Video" else True)
+        # Create new progress bar
+        self.progress_bars_list.append(
+            tkinter.ttk.Progressbar(master=self.frames[1], orient="horizontal",
+                                    variable=download_obj.download_progress_string_var,
+                                    length=self.PROGRESS_BAR_LENGTH))
+        self.progress_bars_list[-1].grid(column=1, row=len(self.progress_bars_list) - 1, sticky=(tkinter.N, tkinter.E))
+
+        # Create a label for the download's name
+        self.download_names_labels_list.append(
+            tkinter.ttk.Label(self.frames[1], textvariable=download_obj.video_title).grid(column=0, row=len(
+                self.progress_bars_list) - 1, sticky=(tkinter.N, tkinter.W)))
+
+        self.downloads_queue.append(download_obj)
         # Append the new download to the downloads queue
         logging.info(url + " has been added to the download queue")
         logging.info("current downloads queue: " + str(self.downloads_queue))
@@ -115,25 +130,11 @@ class YouTubeDownloaderApp:
 
         # Spin up a thread and launch the download
 
-        url = self.downloads_queue.pop()
-        download_obj = YouTubeDownloader(url, self.DOWNLOAD_TEMP_LOC,
-                                         self.COMPLETED_DOWNLOADS_DIR,
-                                         False if self.download_type.get() == "Video" else True)
+        download_obj = self.downloads_queue.popleft()
         self.download_objs_list.append(download_obj)
         self.threads.append(threading.Thread(target=download_obj.run_yt_download))
         self.threads[-1].daemon = True  # Closing the program will kill this thread
         self.threads[-1].start()
-
-        self.progress_bars_list.append(
-            tkinter.ttk.Progressbar(master=self.frames[1], orient="horizontal",
-                                    variable=self.download_objs_list[-1].download_progress_string_var,
-                                    length=self.PROGRESS_BAR_LENGTH))
-
-        self.download_names_labels_list.append(tkinter.ttk.Label(self.frames[1], textvariable=self.download_objs_list[
-            -1].video_title).grid(column=0, row=len(self.progress_bars_list) - 1,
-                                  sticky=(tkinter.N, tkinter.W)))
-
-        self.progress_bars_list[-1].grid(column=1, row=len(self.progress_bars_list) - 1, sticky=(tkinter.N, tkinter.E))
 
         # Initiate monitoring
         if not self.thread_monitoring_active:
