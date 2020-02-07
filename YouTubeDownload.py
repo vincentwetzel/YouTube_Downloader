@@ -41,16 +41,20 @@ class YouTubeDownloader:
             self.output_dir_files[idx] = os.path.splitext(os.path.basename(file))[0].strip()
         self.download_progress_string_var = tkinter.StringVar(value="0")
         self.redownload_video = None
+        self.video_doesnt_exist = False
 
-    def run_yt_download(self) -> bool:
+    def start_yt_download(self) -> bool:
         """
         This is the main download method.
         :return: True if successful, false otherwise.
         """
         self.video_title.set(self.get_video_title())
 
+        if self.video_doesnt_exist:
+            return False
+
         if not self.redownload_video and self.redownload_video is not None:
-            return
+            return False
         while True:
             download_command = self.determine_download_command()
             logging.info("DOWNLOAD COMMAND: " + download_command)
@@ -131,8 +135,8 @@ class YouTubeDownloader:
         else:
             dl_format = ""
 
-        command = "youtube-dl --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
-                                                                                     "%(title)s.%(ext)s"]) + "\" "
+        command = "youtube-dl --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
+                                                                                               "%(title)s.%(ext)s"]) + "\" "
         if self.download_mp3:
             # Audio downloads
             command += "--extract-audio --audio-format mp3 \"" + self.raw_url + "\""
@@ -152,25 +156,30 @@ class YouTubeDownloader:
         """
 
         # Get the video title
-        get_video_title_command = "youtube-dl --get-title --no-playlist \"" + self.raw_url + "\""
+        get_video_title_command = "youtube-dl --verbose --get-title --no-playlist \"" + self.raw_url + "\""
 
         vid_title = None
 
         # Get the video title(s) for the file(s) we are downloading.
         for line in self.run_win_cmd(get_video_title_command):
+            if "youtube_dl.utils.ExtractorError: This video has been removed by the user" in line:
+                self.video_doesnt_exist = True
+                return "ERROR: Video removed"
+
             line = line.strip()
+
+            logging.info(line)
 
             # Colons are not valid in file names in Windows so youtube-dl changes them and we must do the same.
             vid_title = line.replace(":", "-")
-
-            # Print the video title(s)
-            logging.info("VIDEO TITLE IS: " + line)
 
             # If our download already exists, handle the situation.
             if line in self.output_dir_files and self.redownload_video is None:
                 self.redownload_video = tkinter.messagebox.askyesno(title="File is already downloaded",
                                                                     message="We have detected that this file has already been downloaded to " + str(
                                                                         self.FINAL_DESTINATION_DIR) + ". Do you want to download it again?")
+        # Print the video title(s)
+        logging.info("VIDEO TITLE IS: " + vid_title)
         return vid_title
 
     def run_youtube_dl_download(self, download_command) -> bool:

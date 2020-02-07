@@ -77,13 +77,14 @@ class YouTubeDownloaderApp:
         # Check to make sure the URL is valid
         if (url.startswith("https://www.youtube.com/watch?") is False and url.startswith(
                 "https://youtu.be/") is False) or " " in url:
-            logging.debug("Invalid URL: " + url)
+            logging.info("Invalid URL: " + url)
             tkinter.messagebox.showerror(title="Error: Invalid URL",
                                          message="The value on the clipboard is not a valid YouTube URL.")
             return
         if YouTubeDownloader.check_to_see_if_playlist(url):
             playlist_yes = tkinter.messagebox.askyesno(title="Download Playlist",
                                                        message="Do you want to download this entire playlist?")
+            # Handle playlists
             if playlist_yes:
                 matches = []
                 for line in YouTubeDownloader.run_win_cmd("youtube-dl --flat-playlist --dump-json \"" + url + "\""):
@@ -114,7 +115,6 @@ class YouTubeDownloaderApp:
         self.downloads_queue.append(download_obj)
         # Append the new download to the downloads queue
         logging.info(url + " has been added to the download queue")
-        logging.info("current downloads queue: " + str(self.downloads_queue))
 
         self.notebook.select(self.frames[1])
 
@@ -129,10 +129,9 @@ class YouTubeDownloaderApp:
         """
 
         # Spin up a thread and launch the download
-
-        download_obj = self.downloads_queue.popleft()
+        download_obj:YouTubeDownloader = self.downloads_queue.popleft()
         self.download_objs_list.append(download_obj)
-        self.threads.append(threading.Thread(target=download_obj.run_yt_download))
+        self.threads.append(threading.Thread(target=download_obj.start_yt_download))
         self.threads[-1].daemon = True  # Closing the program will kill this thread
         self.threads[-1].start()
 
@@ -147,7 +146,7 @@ class YouTubeDownloaderApp:
         :return: None
         """
         # Clear finished threads
-        for idx, thread in enumerate(list(self.threads)):
+        for idx, thread in enumerate(self.threads):
             if thread.is_alive() is False:
                 del self.threads[idx]
                 logging.debug("threads[" + str(idx) + "] has been deleted.")
@@ -217,6 +216,7 @@ class YouTubeDownloaderApp:
         settings_lines = []
         need_to_rewrite_settings_ini = False
 
+        print("FROM PYTHON:" + str(os.getcwd()))
         if os.path.isfile("settings.ini"):
             with open("settings.ini", 'r') as f:
                 settings_lines = f.readlines()
@@ -261,7 +261,7 @@ class YouTubeDownloaderApp:
                 title="Choose a temporary directory for ongoing downloads")
 
         if need_to_rewrite_settings_ini:
-            logging.debug("Rewriting settings.ini...")
+            logging.info("Rewriting settings.ini...")
             with open("settings.ini", 'w') as newfile:
                 newfile.write("completed_downloads_directory=" + self.COMPLETED_DOWNLOADS_DIR + "\n")
                 newfile.write("temporary_downloads_directory=" + self.DOWNLOAD_TEMP_LOC)
