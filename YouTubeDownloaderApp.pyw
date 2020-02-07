@@ -21,7 +21,7 @@ from YouTubeDownload import YouTubeDownloader
 import re
 
 # NOTE TO USER: use logging.DEBUG for testing, logging.CRITICAL for runtime
-logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
 
 # SAMPLE URLS:
@@ -89,7 +89,7 @@ class YouTubeDownloaderApp:
                 matches = []
                 for line in YouTubeDownloader.run_win_cmd("youtube-dl --flat-playlist --dump-json \"" + url + "\""):
                     if line[0] == "{":
-                        line = line.strip('\n')
+                        line = str(line).strip('\n')
                         search_result = re.search(r'\"url\": \"(.*?)\"', line)
                         if search_result:
                             matches.append(search_result.group(1))
@@ -129,7 +129,7 @@ class YouTubeDownloaderApp:
         """
 
         # Spin up a thread and launch the download
-        download_obj:YouTubeDownloader = self.downloads_queue.popleft()
+        download_obj: YouTubeDownloader = self.downloads_queue.popleft()
         self.download_objs_list.append(download_obj)
         self.threads.append(threading.Thread(target=download_obj.start_yt_download))
         self.threads[-1].daemon = True  # Closing the program will kill this thread
@@ -263,9 +263,9 @@ class YouTubeDownloaderApp:
 
         if need_to_rewrite_settings_ini:
             logging.info("Rewriting settings.ini...")
-            with open("settings.ini", 'w') as newfile:
-                newfile.write("completed_downloads_directory=" + self.COMPLETED_DOWNLOADS_DIR + "\n")
-                newfile.write("temporary_downloads_directory=" + self.DOWNLOAD_TEMP_LOC)
+            with open("settings.ini", 'w') as new_file:
+                new_file.write("completed_downloads_directory=" + self.COMPLETED_DOWNLOADS_DIR + "\n")
+                new_file.write("temporary_downloads_directory=" + self.DOWNLOAD_TEMP_LOC)
 
     @staticmethod
     def verify_is_youtube_url(url: str) -> bool:

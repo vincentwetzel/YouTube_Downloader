@@ -4,6 +4,8 @@ import shutil
 import re
 import subprocess
 import tkinter
+import tkinter.messagebox
+from typing import Generator, List
 
 
 class YouTubeDownloader:
@@ -75,7 +77,8 @@ class YouTubeDownloader:
             else:
                 break
             if self.failed_download_attempts > 10:
-                # Catostrphic failure, kill the download
+                # Catastrophic failure, kill the download
+                logging.info("After many tries, this download has failed.")
                 return False
 
         # Put the downloaded file in its proper location
@@ -91,19 +94,18 @@ class YouTubeDownloader:
                         os.path.join(os.path.dirname(self.output_file_path), os.path.basename(f)))
             output_file_size = os.path.getsize(self.output_file_path)
 
+        # noinspection PyUnusedLocal
         move_after_download = True
         if output_file_size < 209715200:  # 200 MB  # TODO: Modify this with a combobox box??
             move_after_download = True
         elif self.is_video_not_to_move():
             move_after_download = False
         else:
-            move_after_download = tkinter.messagebox.askyesno(title="Move File?",
-                                                              message=str(
-                                                                  self.output_file_path) + " is " + YouTubeDownloader.sizeof_fmt(
-                                                                  output_file_size) + ". Do you still want to move it to " + str(
-                                                                  self.FINAL_DESTINATION_DIR))
+            move_after_download = tkinter.messagebox.askyesno(title="Move File?", message=str(
+                self.output_file_path) + " is " + YouTubeDownloader.sizeof_fmt(
+                output_file_size) + ". Do you still want to move it to " + str(self.FINAL_DESTINATION_DIR))
         if move_after_download:
-            # Use shutil to make sure the file is replaced if it already exists.
+            # Move and replace the file if it already exists.
             shutil.move(self.output_file_path,
                         os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)))
             logging.info("\n" + str(self.output_file_path) + " moved to directory " + str(self.FINAL_DESTINATION_DIR))
@@ -151,7 +153,7 @@ class YouTubeDownloader:
     def get_video_title(self) -> str:
         """
         Gets the title of the file(s) to be downloaded.
-        If the file(s) already exists in the output directory then this method will ask for user input to handle the situation.
+        If the file(s) already exists in the output directory then ask for user input to handle the situation.
 
         :return:    The title(s) of the video(s) to be downloaded as a list.
         """
@@ -167,9 +169,9 @@ class YouTubeDownloader:
                 self.video_doesnt_exist = True
                 return "ERROR: Video removed"
 
-            line = line.strip()
+            line = str(line).strip()
 
-            logging.info(line)
+            logging.debug(line)
 
             # Colons are not valid in file names in Windows so youtube-dl changes them and we must do the same.
             vid_title = line.replace(":", "-")
@@ -177,8 +179,11 @@ class YouTubeDownloader:
             # If our download already exists, handle the situation.
             if line in self.output_dir_files and self.redownload_video is None:
                 self.redownload_video = tkinter.messagebox.askyesno(title="File is already downloaded",
-                                                                    message="We have detected that this file has already been downloaded to " + str(
-                                                                        self.FINAL_DESTINATION_DIR) + ". Do you want to download it again?")
+                                                                    message="This file already exists in "
+                                                                            + str(self.FINAL_DESTINATION_DIR)
+                                                                            + ". Do you want to download it again?")
+                if self.redownload_video:
+                    logging.debug("Redownloading video...")
         # Print the video title(s)
         vid_title = vid_title.encode("ascii", errors="ignore").decode()
         logging.info("VIDEO TITLE IS: " + vid_title)
@@ -186,7 +191,7 @@ class YouTubeDownloader:
 
     def run_youtube_dl_download(self, download_command) -> bool:
         """
-        This pipes a youtube-dl commmand into run_win_cmd().
+        This pipes a youtube-dl command into run_win_cmd().
         The purpose of running download commands this way is to be able to catch and handle errors.
 
         :return:    True if successful, false otherwise
@@ -196,7 +201,7 @@ class YouTubeDownloader:
         download_successful = False
 
         for line in YouTubeDownloader.run_win_cmd(download_command):
-            line = line.strip()  # Strip off \n from each line
+            line = str(line).strip()  # Strip off \n from each line
             logging.info(line)
             if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
                 merge_required = True
@@ -232,7 +237,7 @@ class YouTubeDownloader:
         return download_successful
 
     @staticmethod
-    def run_win_cmd(command: str) -> None:
+    def run_win_cmd(command: str) -> Generator[List[str], None, None]:
         """
         Runs a command in a new cmd window.
         This function ONLY works on Windows OS.
@@ -261,7 +266,7 @@ class YouTubeDownloader:
         Converts a data sizes to more human-readable values.
 
         :param num: The number to convert. This defaults to bytes.
-        :param suffix:  Default is bytes (B). If you want to convert another type then enter it as a parameter here (e.g. MB).
+        :param suffix:  Default is bytes (B). To convert another type, enter it as a parameter here (e.g. MB).
         :return:    The converted value
         """
         for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
