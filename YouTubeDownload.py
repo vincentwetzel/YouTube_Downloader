@@ -136,7 +136,8 @@ class YouTubeDownloader:
             dl_format = ""
 
         command = "youtube-dl --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
-                                                                                               "%(title)s.%(ext)s"]) + "\" "
+                                                                                               self.video_title.get(),
+                                                                                               ".%(ext)s"]) + "\" "
         if self.download_mp3:
             # Audio downloads
             command += "--extract-audio --audio-format mp3 \"" + self.raw_url + "\""
@@ -179,6 +180,7 @@ class YouTubeDownloader:
                                                                     message="We have detected that this file has already been downloaded to " + str(
                                                                         self.FINAL_DESTINATION_DIR) + ". Do you want to download it again?")
         # Print the video title(s)
+        vid_title = vid_title.encode("ascii", errors="ignore").decode()
         logging.info("VIDEO TITLE IS: " + vid_title)
         return vid_title
 
@@ -224,7 +226,7 @@ class YouTubeDownloader:
             if "WARNING: Unable to extract video title" in line:
                 # TODO: Handle this properly
                 logging.info("There is an issue with trying to download this video. You may need to update youtube-dl")
-                input("Press any key to exit this script...")
+                self.video_title.set("ERROR: Unable to extract video title.")
             if re.search(r'^\[download\][\s]+[0-9]+\.[0-9]+%', line):
                 self.download_progress_string_var.set(re.search(r'[0-9]+\.[0-9]+', line).group(0))
         return download_successful

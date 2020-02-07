@@ -160,6 +160,7 @@ class YouTubeDownloaderApp:
             self.root_tk.after(self.UPDATE_INTERVAL, lambda: self.update_threads())
         else:
             logging.debug("check_threads() monitoring ended.")
+            logging.info("All downloads have completed!")
             self.thread_monitoring_active = False
 
     def download_text_var_selected(self, text_var: tkinter.Text) -> None:
