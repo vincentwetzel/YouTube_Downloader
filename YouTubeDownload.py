@@ -127,7 +127,6 @@ class YouTubeDownloader:
 
         :return:    A string with the correct download command.
         """
-        # TODO: Verify this
         if self.failed_download_attempts == 0:
             dl_format = "-f best[ext=mp4]/best"
         elif self.failed_download_attempts == 1:
@@ -228,10 +227,6 @@ class YouTubeDownloader:
                 # When files are converted from video to audio
                 # then the original file has to be removed from output_filepaths.
                 self.output_file_path = os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip())
-            if "WARNING: Unable to extract video title" in line:
-                # TODO: Handle this properly
-                logging.info("There is an issue with trying to download this video. You may need to update youtube-dl")
-                self.video_title.set("ERROR: Unable to extract video title.")
             if re.search(r'^\[download\][\s]+[0-9]+\.[0-9]+%', line):
                 self.download_progress_string_var.set(re.search(r'[0-9]+\.[0-9]+', line).group(0))
         return download_successful
