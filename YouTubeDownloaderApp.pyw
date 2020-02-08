@@ -24,12 +24,6 @@ import re
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
 
-# SAMPLE URLS:
-# https://www.youtube.com/watch?v=KEB16y1zBgA&list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO
-# https://youtu.be/KEB16y1zBgA?list=PLdZ9Lagj8np1dOb8DrHcNkDid9uII9etO&t=1
-# https://www.youtube.com/watch?time_continue=1661&v=EYDwHSGgkm8
-# https://www.youtube.com/watch?v=CqqvzVblbsA&feature=youtu.be
-
 class YouTubeDownloaderApp:
     def __init__(self):
         # Constants

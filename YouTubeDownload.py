@@ -137,7 +137,7 @@ class YouTubeDownloader:
             dl_format = ""
 
         command = "youtube-dl --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
-                                                                                               self.video_title.get(),
+                                                                                               self.video_title.get().replace('"', "'"),
                                                                                                ".%(ext)s"]) + "\" "
         if self.download_mp3:
             # Audio downloads
@@ -184,7 +184,7 @@ class YouTubeDownloader:
                 if self.redownload_video:
                     logging.debug("Redownloading video...")
         # Print the video title(s)
-        vid_title = vid_title.encode("ascii", errors="ignore").decode()
+        vid_title = vid_title.encode("ascii", errors="ignore").decode().strip()
         logging.info("VIDEO TITLE IS: " + vid_title)
         return vid_title
 
