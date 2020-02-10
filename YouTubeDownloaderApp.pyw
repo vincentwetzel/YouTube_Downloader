@@ -25,6 +25,7 @@ logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 
 
 class YouTubeDownloaderApp:
+
     def __init__(self):
         # Constants
         self.COMPLETED_DOWNLOADS_DIR = None
@@ -41,9 +42,12 @@ class YouTubeDownloaderApp:
         self.root_tk.resizable(False, False)
 
         self.notebook: tkinter.ttk.Notebook = None
-        self.frames: List[tkinter.Frame] = list()
-        self.progress_bars_list: List[tkinter.ttk.Progressbar] = list()
-        self.download_names_labels_list: List[str] = list()
+        self.notebook_frames: List[tkinter.Frame] = list()
+        self.downloads_queue_canvas: tkinter.Canvas = None
+        self.downloads_queue_frame: tkinter.Frame = None
+        self.downloads_queue_scrollbar: tkinter.Scrollbar = None
+        self.downloads_queue_progress_bars_list: List[tkinter.ttk.Progressbar] = list()
+        self.downloads_queue_labels_list: List[str] = list()
 
         # Threading Variables
         self.threads: List[threading.Thread] = list()
@@ -95,22 +99,23 @@ class YouTubeDownloaderApp:
                                          self.COMPLETED_DOWNLOADS_DIR,
                                          False if self.download_type.get() == "Video" else True)
         # Create new progress bar
-        self.progress_bars_list.append(
-            tkinter.ttk.Progressbar(master=self.frames[1], orient="horizontal",
+        self.downloads_queue_progress_bars_list.append(
+            tkinter.ttk.Progressbar(master=self.downloads_queue_frame, orient="horizontal",
                                     variable=download_obj.download_progress_string_var,
                                     length=self.PROGRESS_BAR_LENGTH))
-        self.progress_bars_list[-1].grid(column=1, row=len(self.progress_bars_list) - 1, sticky=(tkinter.N, tkinter.E))
+        self.downloads_queue_progress_bars_list[-1].grid(column=1, row=len(self.downloads_queue_progress_bars_list) - 1,
+                                                         sticky=(tkinter.N, tkinter.E))
 
         # Create a label for the download's name
-        self.download_names_labels_list.append(
-            tkinter.ttk.Label(self.frames[1], textvariable=download_obj.video_title).grid(column=0, row=len(
-                self.progress_bars_list) - 1, sticky=(tkinter.N, tkinter.W)))
+        self.downloads_queue_labels_list.append(
+            tkinter.ttk.Label(self.downloads_queue_frame, textvariable=download_obj.video_title).grid(column=0, row=len(
+                self.downloads_queue_progress_bars_list) - 1, sticky=(tkinter.N, tkinter.W)))
 
         self.downloads_queue.append(download_obj)
         # Append the new download to the downloads queue
         logging.info(url + " has been added to the download queue")
 
-        self.notebook.select(self.frames[1])
+        self.notebook.select(self.notebook_frames[1])
 
         # If there is room for another thread, start that download.
         if len(self.threads) < self.maximum_simultaneous_downloads.get():
@@ -172,39 +177,54 @@ class YouTubeDownloaderApp:
     def init_gui(self):
         self.notebook = tkinter.ttk.Notebook(self.root_tk)
 
+        # Init Frames
         for _ in range(3):
-            self.frames.append(tkinter.ttk.Frame(self.notebook, padding="3 3 12 12"))
+            self.notebook_frames.append(tkinter.ttk.Frame(self.notebook, padding="3 3 12 12"))
 
-        self.notebook.add(self.frames[0], text="Download")
-        self.notebook.add(self.frames[1], text="Queue")
-        self.notebook.add(self.frames[2], text="Settings")
+        self.notebook.add(self.notebook_frames[0], text="Download")
+        self.notebook.add(self.notebook_frames[1], text="Queue")
+        self.notebook.add(self.notebook_frames[2], text="Settings")
 
         self.notebook.grid()
         self.notebook.enable_traversal()
 
-        # Text box
-        download_urls_text_var = tkinter.Text(self.frames[0], width=50, height=5)
+        # Queue Frame: other GUI elements
+        self.downloads_queue_canvas = tkinter.Canvas(self.notebook_frames[1], borderwidth=0, background="#ff0000")
+        self.downloads_queue_canvas.bind_all("<MouseWheel>", self.on_mousewheel)
+        self.downloads_queue_frame = tkinter.Frame(self.notebook_frames[1])
+        self.downloads_queue_scrollbar = tkinter.Scrollbar(self.notebook_frames[1], orient="vertical",
+                                                           command=self.downloads_queue_canvas.yview)
+        self.downloads_queue_canvas.configure(yscrollcommand=self.downloads_queue_scrollbar.set)
+        self.downloads_queue_scrollbar.pack(side="right", fill="y")
+        self.downloads_queue_canvas.pack(side="left", fill=tkinter.BOTH, expand=True)
+        self.downloads_queue_canvas.create_window((4, 4), window=self.downloads_queue_frame, anchor="nw")
+        self.downloads_queue_frame.bind("<Configure>",
+                                        lambda event, canvas=self.downloads_queue_canvas: self.on_frame_configure())
+
+        # Download Frame: Text box for download URLs
+        download_urls_text_var = tkinter.Text(self.notebook_frames[0], width=50, height=5)
         download_urls_text_var.grid(column=0, row=0, sticky=(tkinter.W, tkinter.N, tkinter.S), columnspan=11)
         download_urls_text_var.bind('<FocusIn>',
                                     lambda _: self.download_text_var_selected(download_urls_text_var))
 
-        # Download button
-        tkinter.ttk.Button(self.frames[0], text="Download",
+        # Download Frame: Download button
+        tkinter.ttk.Button(self.notebook_frames[0], text="Download",
                            command=lambda: self.add_dls_to_queue(
                                download_urls_text_var.get(1.0, "end").strip())).grid(
             column=11, row=0, sticky=(tkinter.E, tkinter.N, tkinter.S))
 
-        tkinter.ttk.Label(self.frames[0], text="Simultaneous Downloads: ").grid(column=0, row=10,
-                                                                                sticky=(tkinter.E,))
-        combobox = tkinter.ttk.Combobox(self.frames[0], justify="left",
+        # Download Frame: Options Widgets
+        tkinter.ttk.Label(self.notebook_frames[0], text="Simultaneous Downloads: ").grid(column=0, row=10,
+                                                                                         sticky=(tkinter.E,))
+        combobox = tkinter.ttk.Combobox(self.notebook_frames[0], justify="left",
                                         textvariable=self.maximum_simultaneous_downloads, state="readonly",
                                         values=[1, 2, 3, 4])
         combobox.grid(column=1, row=10, sticky=('W',))
 
-        tkinter.ttk.Label(self.frames[0], text="Download type: ").grid(column=10, row=10, sticky=(tkinter.E,))
-        tkinter.Radiobutton(self.frames[0], text="Video", variable=self.download_type,
+        tkinter.ttk.Label(self.notebook_frames[0], text="Download type: ").grid(column=10, row=10, sticky=(tkinter.E,))
+        tkinter.Radiobutton(self.notebook_frames[0], text="Video", variable=self.download_type,
                             value="Video").grid(column=11, row=10, sticky=(tkinter.W,))
-        tkinter.Radiobutton(self.frames[0], text="Audio", variable=self.download_type,
+        tkinter.Radiobutton(self.notebook_frames[0], text="Audio", variable=self.download_type,
                             value="Audio").grid(column=11, row=11, sticky=(tkinter.W,))
 
     def init_settings(self):
@@ -271,6 +291,18 @@ class YouTubeDownloaderApp:
         if (url.startswith("https://www.youtube.com/watch?") or url.startswith("https://youtu.be/")) and " " not in url:
             return True
         return False
+
+    def on_mousewheel(self, event: tkinter.Event):
+        # TODO: Make it so this ONLY works if there are widgets filling the whole screen and I need to enable scrolling.
+        self.downloads_queue_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def on_frame_configure(self) -> None:
+        """
+        Resets the scrollbar region to encompass the inner frame
+        :param canvas:
+        """
+        # Note: bbox is a bounding box
+        self.downloads_queue_canvas.configure(scrollregion=self.downloads_queue_canvas.bbox("all"))
 
 
 def get_clipboard_string() -> str:
