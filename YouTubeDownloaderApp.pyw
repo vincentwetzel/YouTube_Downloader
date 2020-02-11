@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+# TODO: Create a checkbox to allow the app to terminate when downloads complete.
 
 # NOTE TO USER: youtube-dl must be in the system PATH for this to run on Windows.
 # I recommend installing youtube-dl with PIP.
@@ -41,6 +42,7 @@ class YouTubeDownloaderApp:
 
         # GUI variables
         self.root_tk: tkinter.Tk = tkinter.Tk()
+        self.root_tk.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.root_tk.grid_rowconfigure(0, weight=1)
         self.root_tk.grid_columnconfigure(0, weight=1)
         self.root_tk.title("YouTube Downloader by Vincent Wetzel")
@@ -317,6 +319,10 @@ class YouTubeDownloaderApp:
         """
         # Note: bbox is a bounding box
         self.downloads_queue_canvas.configure(scrollregion=self.downloads_queue_canvas.bbox("all"))
+
+    def on_closing(self):
+        if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
+            self.root_tk.destroy()
 
 
 def get_clipboard_string() -> str:
