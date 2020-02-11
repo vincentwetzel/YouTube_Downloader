@@ -1,7 +1,5 @@
 #! /usr/bin/env python3
 
-# TODO: Handle error: "ERROR: This video is unavailable." which occurs for scheduled livestreams
-
 
 # NOTE TO USER: youtube-dl must be in the system PATH for this to run on Windows.
 # I recommend installing youtube-dl with PIP.
@@ -33,12 +31,20 @@ class YouTubeDownloaderApp:
         self.DOWNLOAD_TEMP_LOC = None
         """The temporary location that active downloads are put in"""
         self.UPDATE_INTERVAL = 100
-        self.PROGRESS_BAR_LENGTH = 200
+        """Specifies how often (in milliseconds) the progress bars will update"""
+        self.PROGRESS_BAR_LENGTH = 150
+        """The size of download progress bars"""
+        self.WINDOW_WIDTH = 700
+        """App window width"""
+        self.WINDOW_HEIGHT = 500
+        """App window height"""
 
         # GUI variables
         self.root_tk: tkinter.Tk = tkinter.Tk()
+        self.root_tk.grid_rowconfigure(0, weight=1)
+        self.root_tk.grid_columnconfigure(0, weight=1)
         self.root_tk.title("YouTube Downloader by Vincent Wetzel")
-        self.root_tk.geometry("700x500")
+        self.root_tk.geometry(str(self.WINDOW_WIDTH) + "x" + str(self.WINDOW_HEIGHT))
         self.root_tk.resizable(False, False)
 
         self.notebook: tkinter.ttk.Notebook = None
@@ -47,7 +53,7 @@ class YouTubeDownloaderApp:
         self.downloads_queue_frame: tkinter.Frame = None
         self.downloads_queue_scrollbar: tkinter.Scrollbar = None
         self.downloads_queue_progress_bars_list: List[tkinter.ttk.Progressbar] = list()
-        self.downloads_queue_labels_list: List[str] = list()
+        self.downloads_queue_labels_list: List[tkinter.Label] = list()
 
         # Threading Variables
         self.threads: List[threading.Thread] = list()
@@ -98,18 +104,22 @@ class YouTubeDownloaderApp:
         download_obj = YouTubeDownloader(url, self.DOWNLOAD_TEMP_LOC,
                                          self.COMPLETED_DOWNLOADS_DIR,
                                          False if self.download_type.get() == "Video" else True)
+
+        # Create a label for the download's name
+        self.downloads_queue_labels_list.append(
+            tkinter.ttk.Label(self.downloads_queue_frame, textvariable=download_obj.video_title, anchor=tkinter.W,
+                              width=80,
+                              wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50
+                              ).grid(column=0, row=len(
+                self.downloads_queue_progress_bars_list), sticky=(tkinter.W, tkinter.E)))
+
         # Create new progress bar
         self.downloads_queue_progress_bars_list.append(
             tkinter.ttk.Progressbar(master=self.downloads_queue_frame, orient="horizontal",
                                     variable=download_obj.download_progress_string_var,
                                     length=self.PROGRESS_BAR_LENGTH))
         self.downloads_queue_progress_bars_list[-1].grid(column=1, row=len(self.downloads_queue_progress_bars_list) - 1,
-                                                         sticky=(tkinter.N, tkinter.E))
-
-        # Create a label for the download's name
-        self.downloads_queue_labels_list.append(
-            tkinter.ttk.Label(self.downloads_queue_frame, textvariable=download_obj.video_title).grid(column=0, row=len(
-                self.downloads_queue_progress_bars_list) - 1, sticky=(tkinter.N, tkinter.W)))
+                                                         sticky=tkinter.E)
 
         self.downloads_queue.append(download_obj)
         # Append the new download to the downloads queue
@@ -185,23 +195,27 @@ class YouTubeDownloaderApp:
         self.notebook.add(self.notebook_frames[1], text="Queue")
         self.notebook.add(self.notebook_frames[2], text="Settings")
 
-        self.notebook.grid()
+        self.notebook.grid(sticky=(tkinter.N, tkinter.S, tkinter.W, tkinter.E))
+        # self.notebook.grid_rowconfigure(0, weight=0)
+        # self.notebook.grid_columnconfigure(0, weight=0)
         self.notebook.enable_traversal()
 
         # Queue Frame: other GUI elements
-        self.downloads_queue_canvas = tkinter.Canvas(self.notebook_frames[1], borderwidth=0, background="#ff0000")
+        self.downloads_queue_canvas = tkinter.Canvas(self.notebook_frames[1], borderwidth=0)
         self.downloads_queue_canvas.bind_all("<MouseWheel>", self.on_mousewheel)
-        self.downloads_queue_frame = tkinter.Frame(self.notebook_frames[1])
+        self.downloads_queue_frame = tkinter.Frame(self.downloads_queue_canvas)
+        self.downloads_queue_frame.grid(sticky="nswe")
+        self.downloads_queue_frame.grid_columnconfigure(0, weight=1)
         self.downloads_queue_scrollbar = tkinter.Scrollbar(self.notebook_frames[1], orient="vertical",
                                                            command=self.downloads_queue_canvas.yview)
         self.downloads_queue_canvas.configure(yscrollcommand=self.downloads_queue_scrollbar.set)
-        self.downloads_queue_scrollbar.pack(side="right", fill="y")
-        self.downloads_queue_canvas.pack(side="left", fill=tkinter.BOTH, expand=True)
+        self.downloads_queue_scrollbar.pack(side="right", fill=tkinter.Y)
+        self.downloads_queue_canvas.pack(fill=tkinter.BOTH, expand=True)
         self.downloads_queue_canvas.create_window((4, 4), window=self.downloads_queue_frame, anchor="nw")
         self.downloads_queue_frame.bind("<Configure>",
                                         lambda event, canvas=self.downloads_queue_canvas: self.on_frame_configure())
 
-        # Download Frame: Text box for download URLs
+        # Download Frame: Text box to enter download URLs
         download_urls_text_var = tkinter.Text(self.notebook_frames[0], width=50, height=5)
         download_urls_text_var.grid(column=0, row=0, sticky=(tkinter.W, tkinter.N, tkinter.S), columnspan=11)
         download_urls_text_var.bind('<FocusIn>',
@@ -293,8 +307,8 @@ class YouTubeDownloaderApp:
         return False
 
     def on_mousewheel(self, event: tkinter.Event):
-        # TODO: Make it so this ONLY works if there are widgets filling the whole screen and I need to enable scrolling.
-        self.downloads_queue_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        if len(self.downloads_queue_labels_list) > 15:
+            self.downloads_queue_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
     def on_frame_configure(self) -> None:
         """
