@@ -66,12 +66,14 @@ class YouTubeDownloaderApp:
         self.downloads_queue: deque = deque()
         self.download_objs_list: List[YouTubeDownloader] = list()
 
+        # Other globals
         self.download_type: tkinter.StringVar = tkinter.StringVar(value="Video")
         """False is MP4, True is mp3"""
+        self.exit_after_downloads_bool_var: tkinter.BooleanVar = tkinter.BooleanVar()
 
+        # Start the script!
         self.init_gui()
         self.init_settings()
-
         self.root_tk.mainloop()
 
     def add_dls_to_queue(self, url: str) -> None:
@@ -173,6 +175,8 @@ class YouTubeDownloaderApp:
             logging.debug("check_threads() monitoring ended.")
             logging.info("All downloads have completed!")
             self.thread_monitoring_active = False
+            if self.exit_after_downloads_bool_var.get():
+                self.root_tk.destroy()
 
     def download_text_var_selected(self, text_var: tkinter.Text) -> None:
         """
@@ -186,7 +190,7 @@ class YouTubeDownloaderApp:
             text_var.delete(1.0, "end")
             text_var.insert(1.0, clipboard_url)
 
-    def init_gui(self):
+    def init_gui(self) -> None:
         self.notebook = tkinter.ttk.Notebook(self.root_tk)
 
         # Init Frames
@@ -219,7 +223,7 @@ class YouTubeDownloaderApp:
 
         # Download Frame: Text box to enter download URLs
         download_urls_text_var = tkinter.Text(self.notebook_frames[0], width=50, height=5)
-        download_urls_text_var.grid(column=0, row=0, sticky=(tkinter.W, tkinter.N, tkinter.S), columnspan=11)
+        download_urls_text_var.grid(column=0, row=0, sticky=(tkinter.W, tkinter.N, tkinter.S), columnspan=10)
         download_urls_text_var.bind('<FocusIn>',
                                     lambda _: self.download_text_var_selected(download_urls_text_var))
 
@@ -227,21 +231,24 @@ class YouTubeDownloaderApp:
         tkinter.ttk.Button(self.notebook_frames[0], text="Download",
                            command=lambda: self.add_dls_to_queue(
                                download_urls_text_var.get(1.0, "end").strip())).grid(
-            column=11, row=0, sticky=(tkinter.E, tkinter.N, tkinter.S))
+            column=10, row=0, sticky=(tkinter.E, tkinter.N, tkinter.S))
 
-        # Download Frame: Options Widgets
-        tkinter.ttk.Label(self.notebook_frames[0], text="Simultaneous Downloads: ").grid(column=0, row=10,
-                                                                                         sticky=(tkinter.E,))
+        # Download Frame: Simultaneous Downloads
+        tkinter.ttk.Label(self.notebook_frames[0], text="Simultaneous Downloads: ").grid(column=1, row=10)
         combobox = tkinter.ttk.Combobox(self.notebook_frames[0], justify="left",
                                         textvariable=self.maximum_simultaneous_downloads, state="readonly",
-                                        values=[1, 2, 3, 4])
-        combobox.grid(column=1, row=10, sticky=('W',))
+                                        values=[1, 2, 3, 4]).grid(column=1, row=11)
 
+        # Download Frame: Audio or Video download?
         tkinter.ttk.Label(self.notebook_frames[0], text="Download type: ").grid(column=10, row=10, sticky=(tkinter.E,))
         tkinter.Radiobutton(self.notebook_frames[0], text="Video", variable=self.download_type,
-                            value="Video").grid(column=11, row=10, sticky=(tkinter.W,))
+                            value="Video").grid(column=10, row=11, sticky=(tkinter.W,))
         tkinter.Radiobutton(self.notebook_frames[0], text="Audio", variable=self.download_type,
-                            value="Audio").grid(column=11, row=11, sticky=(tkinter.W,))
+                            value="Audio").grid(column=10, row=12, sticky=(tkinter.W,))
+
+        # Add a Checkbutton so the user can automatically close the app when downloads complete
+        tkinter.Label(self.notebook_frames[0], text="Exit after Downloads Complete:").grid(column=0, row=10)
+        tkinter.Checkbutton(self.notebook_frames[0], variable=self.exit_after_downloads_bool_var).grid(column=0, row=11)
 
     def init_settings(self):
         settings_lines = []
@@ -321,7 +328,11 @@ class YouTubeDownloaderApp:
         self.downloads_queue_canvas.configure(scrollregion=self.downloads_queue_canvas.bbox("all"))
 
     def on_closing(self):
-        if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
+        if self.threads:
+            print("THREADS")
+            if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
+                self.root_tk.destroy()
+        else:
             self.root_tk.destroy()
 
 
@@ -331,8 +342,12 @@ def get_clipboard_string() -> str:
     :return:
     """
     win32clipboard.OpenClipboard()
-    clipboard_str = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
-        "utf-8"))  # must decode from bytes to string
+    try:
+        clipboard_str = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
+            "utf-8"))  # must decode from bytes to string
+    except TypeError:
+        logging.info("The value on the clipboard is not text.")
+        clipboard_str = None
     win32clipboard.CloseClipboard()
     return clipboard_str
 
