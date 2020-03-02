@@ -8,7 +8,7 @@ import tkinter.messagebox
 from typing import Generator, List
 
 
-class YouTubeDownloader:
+class YouTubeDownload:
 
     def __init__(self, raw_url, temp_dl_loc, final_destination_dir: str, download_mp3=False):
         """
@@ -92,7 +92,7 @@ class YouTubeDownloader:
             move_after_download = False
         else:
             move_after_download = tkinter.messagebox.askyesno(title="Move File?", message=str(
-                self.output_file_path) + " is " + YouTubeDownloader.sizeof_fmt(
+                self.output_file_path) + " is " + YouTubeDownload.sizeof_fmt(
                 output_file_size) + ". Do you still want to move it to " + str(self.FINAL_DESTINATION_DIR))
         if move_after_download:
             # Move and replace the file if it already exists.
@@ -163,8 +163,10 @@ class YouTubeDownloader:
 
             logging.debug(line)
 
-            # Colons are not valid in file names in Windows so youtube-dl changes them and we must do the same.
-            vid_title = line.replace(":", "-")
+            vid_title = line
+            for c in ['/', '\\', ':', '*', '?', '\"', '<', '>', '|']:
+                if c in vid_title:
+                    vid_title = vid_title.replace(c, '_')
 
             # If our download already exists, handle the situation.
             if line in self.output_dir_files and self.redownload_video is None:
@@ -190,7 +192,7 @@ class YouTubeDownloader:
         merge_required = False
         download_successful = False
 
-        for line in YouTubeDownloader.run_win_cmd(download_command):
+        for line in YouTubeDownload.run_win_cmd(download_command):
             line = str(line).strip()  # Strip off \n from each line
             logging.info(line)
             if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:

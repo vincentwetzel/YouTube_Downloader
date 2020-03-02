@@ -16,7 +16,7 @@ import tkinter.messagebox
 import tkinter.filedialog
 import logging
 import threading
-from YouTubeDownload import YouTubeDownloader
+from YouTubeDownload import YouTubeDownload
 import re
 
 # NOTE TO USER: use logging.DEBUG for testing, logging.CRITICAL for runtime
@@ -64,7 +64,7 @@ class YouTubeDownloaderApp:
 
         # Download management variables
         self.downloads_queue: deque = deque()
-        self.download_objs_list: List[YouTubeDownloader] = list()
+        self.download_objs_list: List[YouTubeDownload] = list()
 
         # Other globals
         self.download_type: tkinter.StringVar = tkinter.StringVar(value="Video")
@@ -89,13 +89,13 @@ class YouTubeDownloaderApp:
             tkinter.messagebox.showerror(title="Error: Invalid URL",
                                          message="The value on the clipboard is not a valid YouTube URL.")
             return
-        if YouTubeDownloader.check_to_see_if_playlist(url):
+        if YouTubeDownload.check_to_see_if_playlist(url):
             playlist_yes = tkinter.messagebox.askyesno(title="Download Playlist",
                                                        message="Do you want to download this entire playlist?")
             # Handle playlists
             if playlist_yes:
                 matches = []
-                for line in YouTubeDownloader.run_win_cmd("youtube-dl --flat-playlist --dump-json \"" + url + "\""):
+                for line in YouTubeDownload.run_win_cmd("youtube-dl --flat-playlist --dump-json \"" + url + "\""):
                     if line[0] == "{":
                         line = str(line).strip('\n')
                         search_result = re.search(r'\"url\": \"(.*?)\"', line)
@@ -105,9 +105,9 @@ class YouTubeDownloaderApp:
                     self.add_dls_to_queue("https://www.youtube.com/watch?v=" + match)
                 return
 
-        download_obj = YouTubeDownloader(url, self.DOWNLOAD_TEMP_LOC,
-                                         self.COMPLETED_DOWNLOADS_DIR,
-                                         False if self.download_type.get() == "Video" else True)
+        download_obj = YouTubeDownload(url, self.DOWNLOAD_TEMP_LOC,
+                                       self.COMPLETED_DOWNLOADS_DIR,
+                                       False if self.download_type.get() == "Video" else True)
 
         # Create a label for the download's name
         self.downloads_queue_labels_list.append(
@@ -142,7 +142,7 @@ class YouTubeDownloaderApp:
         """
 
         # Spin up a thread and launch the download
-        download_obj: YouTubeDownloader = self.downloads_queue.popleft()
+        download_obj: YouTubeDownload = self.downloads_queue.popleft()
         self.download_objs_list.append(download_obj)
         self.threads.append(threading.Thread(target=download_obj.start_yt_download))
         self.threads[-1].daemon = True  # Closing the program will kill this thread
