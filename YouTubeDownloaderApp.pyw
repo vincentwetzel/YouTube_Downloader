@@ -63,7 +63,9 @@ class YouTubeDownloaderApp:
         self.maximum_simultaneous_downloads: tkinter.IntVar = tkinter.IntVar(master=self.root_tk, value=2)
 
         # Download management variables
-        self.downloads_queue: deque = deque()
+        """A deque of objects waiting to be downloaded"""
+        self.downloads_queue: deque[YouTubeDownload] = deque()
+        """A list of active downloads"""
         self.download_objs_list: List[YouTubeDownload] = list()
 
         # Other globals
@@ -89,10 +91,25 @@ class YouTubeDownloaderApp:
             tkinter.messagebox.showerror(title="Error: Invalid URL",
                                          message="The value on the clipboard is not a valid YouTube URL.")
             return
+
+        # If this URL is already in the downloads queue, ignore it and tell the user
+        for dl_obj in list(self.downloads_queue):
+            if url == dl_obj.raw_url:
+                tkinter.messagebox.showerror(title="ERROR: Download already exists",
+                                             message="This download is already in the queue!")
+                return
+
+        # If this URL is currently being downloaded, ignore it and tell the user
+        for dl_obj in self.download_objs_list:
+            if url == dl_obj.raw_url:
+                tkinter.messagebox.showerror(title="ERROR: Download already exists",
+                                             message="This item is currently being downloaded!")
+                return
+
+        # handle playlist URLs
         if YouTubeDownload.check_to_see_if_playlist(url):
             playlist_yes = tkinter.messagebox.askyesno(title="Download Playlist",
                                                        message="Do you want to download this entire playlist?")
-            # Handle playlists
             if playlist_yes:
                 matches = []
                 for line in YouTubeDownload.run_win_cmd("youtube-dl --flat-playlist --dump-json \"" + url + "\""):
@@ -105,11 +122,12 @@ class YouTubeDownloaderApp:
                     self.add_dls_to_queue("https://www.youtube.com/watch?v=" + match)
                 return
 
+        # create YouTubeDownload object to store info about the download
         download_obj = YouTubeDownload(url, self.DOWNLOAD_TEMP_LOC,
                                        self.COMPLETED_DOWNLOADS_DIR,
                                        False if self.download_type.get() == "Video" else True)
 
-        # Create a label for the download's name
+        # Create a GUI Label for the download's name
         self.downloads_queue_labels_list.append(
             tkinter.ttk.Label(self.downloads_queue_frame, textvariable=download_obj.video_title, anchor=tkinter.W,
                               width=80,
@@ -117,7 +135,7 @@ class YouTubeDownloaderApp:
                               ).grid(column=0, row=len(
                 self.downloads_queue_progress_bars_list), sticky=(tkinter.W, tkinter.E)))
 
-        # Create new progress bar
+        # Create new progress bar for this download
         self.downloads_queue_progress_bars_list.append(
             tkinter.ttk.Progressbar(master=self.downloads_queue_frame, orient="horizontal",
                                     variable=download_obj.download_progress_string_var,
@@ -125,13 +143,14 @@ class YouTubeDownloaderApp:
         self.downloads_queue_progress_bars_list[-1].grid(column=1, row=len(self.downloads_queue_progress_bars_list) - 1,
                                                          sticky=tkinter.E)
 
-        self.downloads_queue.append(download_obj)
         # Append the new download to the downloads queue
+        self.downloads_queue.append(download_obj)
         logging.info(url + " has been added to the download queue")
 
+        # Move the GUI to the downloads tab
         self.notebook.select(self.notebook_frames[1])
 
-        # If there is room for another thread, start that download.
+        # If there are available threads, start the download
         if len(self.threads) < self.maximum_simultaneous_downloads.get():
             self.start_download_thread()
 
