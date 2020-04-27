@@ -6,6 +6,7 @@ import subprocess
 import tkinter
 import tkinter.messagebox
 from typing import Generator, List
+from urllib.error import HTTPError
 
 
 class YouTubeDownload:
@@ -45,6 +46,8 @@ class YouTubeDownload:
         self.redownload_video = None
         self.video_doesnt_exist = False
 
+        self.need_to_clear_download_cache = False
+
     def start_yt_download(self) -> bool:
         """
         This is the main download method.
@@ -63,7 +66,13 @@ class YouTubeDownload:
 
             # Run command to download the file
             result_successful = self.run_youtube_dl_download(download_command)
-            if not result_successful:
+            if result_successful:
+                break
+            elif not result_successful and self.need_to_clear_download_cache:
+                for cache_clear_line in self.run_win_cmd("youtube-dl --rm-cache-dir"):
+                    logging.info(cache_clear_line)
+                logging.debug("Download cache clearing successful. Attempting to redo download...")
+            else:
                 logging.info("Download attempt #" + str(self.failed_download_attempts + 1) + " failed.")
                 self.failed_download_attempts += 1
 
@@ -74,8 +83,6 @@ class YouTubeDownload:
                         logging.info("Deleting failed download file: " + str(dir_item))
                         os.remove(os.path.join(self.TEMP_DOWNLOAD_LOC, dir_item))
 
-            else:
-                break
             if self.failed_download_attempts > 10:
                 # Catastrophic failure, kill the download
                 logging.info("After many tries, this download has failed.")
@@ -222,6 +229,10 @@ class YouTubeDownload:
                 self.output_file_path = os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip())
             if re.search(r'^\[download\][\s]+[0-9]+\.[0-9]+%', line):
                 self.download_progress_string_var.set(re.search(r'[0-9]+\.[0-9]+', line).group(0))
+            if "ERROR: unable to download video data: HTTP Error 403: Forbidden" in line:
+                self.need_to_clear_download_cache = True
+                return False
+
         return download_successful
 
     @staticmethod

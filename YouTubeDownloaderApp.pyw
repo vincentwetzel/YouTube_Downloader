@@ -20,7 +20,7 @@ from YouTubeDownload import YouTubeDownload
 import re
 
 # NOTE TO USER: use logging.DEBUG for testing, logging.CRITICAL for runtime
-logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 
 class YouTubeDownloaderApp:
