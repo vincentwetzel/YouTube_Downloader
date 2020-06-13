@@ -66,7 +66,7 @@ class YouTubeDownloaderApp:
         """A deque of objects waiting to be downloaded"""
         self.downloads_queue: deque[YouTubeDownload] = deque()
         """A list of active downloads"""
-        self.download_objs_list: List[YouTubeDownload] = list()
+        self.active_dl_objs_list: List[YouTubeDownload] = list()
 
         # Other globals
         self.download_type: tkinter.StringVar = tkinter.StringVar(value="Video")
@@ -100,7 +100,7 @@ class YouTubeDownloaderApp:
                 return
 
         # If this URL is currently being downloaded, ignore it and tell the user
-        for dl_obj in self.download_objs_list:
+        for dl_obj in self.active_dl_objs_list:
             if url == dl_obj.raw_url:
                 tkinter.messagebox.showerror(title="ERROR: Download already exists",
                                              message="This item is currently being downloaded!")
@@ -162,7 +162,7 @@ class YouTubeDownloaderApp:
 
         # Spin up a thread and launch the download
         download_obj: YouTubeDownload = self.downloads_queue.popleft()
-        self.download_objs_list.append(download_obj)
+        self.active_dl_objs_list.append(download_obj)
         self.threads.append(threading.Thread(target=download_obj.start_yt_download))
         self.threads[-1].daemon = True  # Closing the program will kill this thread
         self.threads[-1].start()
@@ -182,14 +182,17 @@ class YouTubeDownloaderApp:
             if thread.is_alive() is False:
                 del self.threads[idx]
                 logging.debug("threads[" + str(idx) + "] has been deleted.")
+                del self.active_dl_objs_list[idx]
+                logging.debug("active_dl_objs_list[" + str(idx) + "] has been deleted.")
 
         # If we do not have all available threads running and there are queued downloads then launch a new thread.
         if len(self.threads) < self.maximum_simultaneous_downloads.get() and self.downloads_queue:
             self.start_download_thread()
 
+        # If threads are active, recursively call check_threads()
         if self.threads:
-            # If threads are active, recursively call check_threads()
             self.root_tk.after(self.UPDATE_INTERVAL, lambda: self.update_threads())
+        # Else, all downloads have completed
         else:
             logging.debug("check_threads() monitoring ended.")
             logging.info("All downloads have completed!")
