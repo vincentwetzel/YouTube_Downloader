@@ -72,6 +72,7 @@ class YouTubeDownloaderApp:
         self.download_type: tkinter.StringVar = tkinter.StringVar(value="Video")
         """False is MP4, True is mp3"""
         self.exit_after_downloads_bool_var: tkinter.BooleanVar = tkinter.BooleanVar()
+        self.completed_downloads: int = 0
 
         # Start the script!
         self.init_gui()
@@ -129,12 +130,11 @@ class YouTubeDownloaderApp:
 
         # Create a GUI Label for the download's name
         self.downloads_queue_labels_list.append(
-            tkinter.ttk.Label(self.downloads_queue_frame, textvariable=download_obj.video_title, anchor=tkinter.W,
-                              width=80,
-                              wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50
-                              ).grid(column=0, row=len(
-                self.downloads_queue_progress_bars_list), sticky=(tkinter.W, tkinter.E)))
-
+            tkinter.Label(self.downloads_queue_frame, textvariable=download_obj.video_title, anchor=tkinter.W,
+                          width=80, wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50))
+        self.downloads_queue_labels_list[-1].grid(column=0, row=len(
+            self.downloads_queue_progress_bars_list), sticky=(tkinter.W, tkinter.E))
+        print(str(self.downloads_queue_labels_list))
         # Create new progress bar for this download
         self.downloads_queue_progress_bars_list.append(
             tkinter.ttk.Progressbar(master=self.downloads_queue_frame, orient="horizontal",
@@ -180,10 +180,21 @@ class YouTubeDownloaderApp:
         # Clear finished threads
         for idx, thread in enumerate(self.threads):
             if thread.is_alive() is False:
+                # Make the Label containing the name of the video being downloaded independent from the download object
+                # so it isn't destroyed when the download object is deleted
+                self.downloads_queue_labels_list[self.completed_downloads + idx]["text"] = self.active_dl_objs_list[
+                    idx].video_title.get()
+
+                # Delete the download thread
                 del self.threads[idx]
                 logging.debug("threads[" + str(idx) + "] has been deleted.")
+
+                # Delete the download object
                 del self.active_dl_objs_list[idx]
                 logging.debug("active_dl_objs_list[" + str(idx) + "] has been deleted.")
+
+                # Update the completed downloads counter
+                self.completed_downloads += 1
 
         # If we do not have all available threads running and there are queued downloads then launch a new thread.
         if len(self.threads) < self.maximum_simultaneous_downloads.get() and self.downloads_queue:
