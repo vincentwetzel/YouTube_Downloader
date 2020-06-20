@@ -131,7 +131,7 @@ class YouTubeDownloaderApp:
         # Create a GUI Label for the download's name
         self.downloads_queue_labels_list.append(
             tkinter.Label(self.downloads_queue_frame, textvariable=download_obj.video_title, anchor=tkinter.W,
-                          width=80, wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50))
+                          width=70, wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50))
         self.downloads_queue_labels_list[-1].grid(column=0, row=len(
             self.downloads_queue_progress_bars_list), sticky=(tkinter.W, tkinter.E))
         print(str(self.downloads_queue_labels_list))
@@ -211,7 +211,7 @@ class YouTubeDownloaderApp:
             if self.exit_after_downloads_bool_var.get():
                 self.root_tk.destroy()
 
-    def download_text_var_selected(self, text_var: tkinter.Text) -> None:
+    def download_text_field_selected(self, text_var: tkinter.Text) -> None:
         """
         If the download Text field is selected when a valid YouTube URL is on the clipboard,
         copy that value into the entry's StringVar.
@@ -258,7 +258,7 @@ class YouTubeDownloaderApp:
         download_urls_text_var = tkinter.Text(self.notebook_frames[0], width=50, height=5)
         download_urls_text_var.grid(column=0, row=0, sticky=(tkinter.W, tkinter.N, tkinter.S), columnspan=10)
         download_urls_text_var.bind('<FocusIn>',
-                                    lambda _: self.download_text_var_selected(download_urls_text_var))
+                                    lambda _: self.download_text_field_selected(download_urls_text_var))
 
         # Download Frame: Download button
         tkinter.ttk.Button(self.notebook_frames[0], text="Download",
