@@ -131,7 +131,7 @@ class YouTubeDownloaderApp:
         # Create a GUI Label for the download's name
         self.downloads_queue_labels_list.append(
             tkinter.Label(self.downloads_queue_frame, textvariable=download_obj.video_title, anchor=tkinter.W,
-                          width=70, wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50))
+                          justify=tkinter.W, width=70, wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50))
         self.downloads_queue_labels_list[-1].grid(column=0, row=len(
             self.downloads_queue_progress_bars_list), sticky=(tkinter.W, tkinter.E))
         print(str(self.downloads_queue_labels_list))
