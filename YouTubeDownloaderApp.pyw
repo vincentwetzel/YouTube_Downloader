@@ -6,8 +6,6 @@
 # I recommend installing youtube-dl with PIP.
 from collections import deque
 from typing import List
-import win32clipboard
-import win32con
 import os
 import sys
 import tkinter
@@ -218,10 +216,10 @@ class YouTubeDownloaderApp:
         :param text_var: The Entry associated with this entry.
         :return: None
         """
-        clipboard_url = get_clipboard_string()
-        if self.verify_is_youtube_url(clipboard_url):
+        clipboard_val = self.root_tk.clipboard_get()
+        if isinstance(clipboard_val, str) and self.verify_is_youtube_url(clipboard_val):
             text_var.delete(1.0, "end")
-            text_var.insert(1.0, clipboard_url)
+            text_var.insert(1.0, clipboard_val)
 
     def init_gui(self) -> None:
         self.notebook = tkinter.ttk.Notebook(self.root_tk)
@@ -367,22 +365,6 @@ class YouTubeDownloaderApp:
                 self.root_tk.destroy()
         else:
             self.root_tk.destroy()
-
-
-def get_clipboard_string() -> str:
-    """
-    Helper method to quickly get the string on the clipboard
-    :return:
-    """
-    win32clipboard.OpenClipboard()
-    try:
-        clipboard_str = str((win32clipboard.GetClipboardData(win32con.CF_TEXT)).decode(
-            "utf-8"))  # must decode from bytes to string
-    except TypeError:
-        logging.info("The value on the clipboard is not text.")
-        clipboard_str = None
-    win32clipboard.CloseClipboard()
-    return clipboard_str
 
 
 if __name__ == "__main__":
