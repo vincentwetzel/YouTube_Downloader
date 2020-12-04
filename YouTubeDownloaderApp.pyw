@@ -24,6 +24,10 @@ logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 class YouTubeDownloaderApp:
 
     def __init__(self):
+        """
+        Sets up the app.
+        """
+
         # Constants
         self.COMPLETED_DOWNLOADS_DIR = None
         """The directory that completed downloads will be moved to"""
@@ -217,11 +221,15 @@ class YouTubeDownloaderApp:
         :return: None
         """
         clipboard_val = self.root_tk.clipboard_get()
-        if isinstance(clipboard_val, str) and self.verify_is_youtube_url(clipboard_val):
+        if isinstance(clipboard_val, str):
             text_var.delete(1.0, "end")
             text_var.insert(1.0, clipboard_val)
 
     def init_gui(self) -> None:
+        """
+        Initializes the app's GUI.
+        :return: None
+        """
         self.notebook = tkinter.ttk.Notebook(self.root_tk)
 
         # Init Frames
@@ -282,6 +290,10 @@ class YouTubeDownloaderApp:
         tkinter.Checkbutton(self.notebook_frames[0], variable=self.exit_after_downloads_bool_var).grid(column=0, row=11)
 
     def init_settings(self):
+        """
+        Initializes the app by loading certain values from storage files.
+        :return: None
+        """
         settings_lines = []
         need_to_rewrite_settings_ini = False
 
@@ -335,18 +347,12 @@ class YouTubeDownloaderApp:
                 new_file.write("completed_downloads_directory=" + self.COMPLETED_DOWNLOADS_DIR + "\n")
                 new_file.write("temporary_downloads_directory=" + self.DOWNLOAD_TEMP_LOC)
 
-    @staticmethod
-    def verify_is_youtube_url(url: str) -> bool:
-        """
-        Verifies that a given URL is a YouTube URL.
-        :param url: The URL to check
-        :return: True if it is a YouTube URL, False if it is not
-        """
-        if (url.startswith("https://www.youtube.com/watch?") or url.startswith("https://youtu.be/")) and " " not in url:
-            return True
-        return False
-
     def on_mousewheel(self, event: tkinter.Event):
+        """
+        Mouse event handler to scroll Canvas up/down
+        :param event: Tkinter Event
+        :return: None
+        """
         if len(self.downloads_queue_labels_list) > 15:
             self.downloads_queue_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
@@ -359,6 +365,10 @@ class YouTubeDownloaderApp:
         self.downloads_queue_canvas.configure(scrollregion=self.downloads_queue_canvas.bbox("all"))
 
     def on_closing(self):
+        """
+        Confirm application exits
+        :return: None
+        """
         if self.threads:
             print("THREADS")
             if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
