@@ -85,15 +85,8 @@ class YouTubeDownloaderApp:
         """
         Adds a URL to the download queue and attempts to start it.
         :type url: A URL to be added to the download queue.
-        :return:
+        :return: None
         """
-        # Check to make sure the URL is valid
-        if (url.startswith("https://www.youtube.com/watch?") is False and url.startswith(
-                "https://youtu.be/") is False) or " " in url:
-            logging.info("Invalid URL: " + url)
-            tkinter.messagebox.showerror(title="Error: Invalid URL",
-                                         message="The value on the clipboard is not a valid YouTube URL.")
-            return
 
         # If this URL is already in the downloads queue, ignore it and tell the user
         for dl_obj in list(self.downloads_queue):
