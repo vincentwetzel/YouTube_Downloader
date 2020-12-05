@@ -208,7 +208,7 @@ class YouTubeDownloaderApp:
 
     def download_text_field_selected(self, text_var: tkinter.Text) -> None:
         """
-        If the download Text field is selected when a valid YouTube URL is on the clipboard,
+        If the download Text field is selected when a valid download URL is on the clipboard,
         copy that value into the entry's StringVar.
         :param text_var: The Entry associated with this entry.
         :return: None

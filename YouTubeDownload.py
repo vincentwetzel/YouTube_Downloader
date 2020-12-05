@@ -18,9 +18,6 @@ class YouTubeDownload:
         :param download_mp3:
         """
         self.raw_url = raw_url
-        if (raw_url.startswith("https://www.youtube.com/watch?") is False and raw_url.startswith(
-                "https://youtu.be/") is False) or " " in raw_url:
-            raise Exception("This is not a valid YouTube URL.")
         self.FINAL_DESTINATION_DIR = final_destination_dir
         self.TEMP_DOWNLOAD_LOC = temp_dl_loc
         self.output_dir_files = os.listdir(
