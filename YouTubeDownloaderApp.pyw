@@ -119,7 +119,7 @@ class YouTubeDownloaderApp:
                 return
 
         # create YouTubeDownload object to store info about the download
-        download_obj = YouTubeDownload(url, self.DOWNLOAD_TEMP_LOC,
+        download_obj = YouTubeDownload(self.root_tk, url, self.DOWNLOAD_TEMP_LOC,
                                        self.COMPLETED_DOWNLOADS_DIR,
                                        False if self.download_type.get() == "Video" else True)
 
@@ -363,7 +363,6 @@ class YouTubeDownloaderApp:
         :return: None
         """
         if self.threads:
-            print("THREADS")
             if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
                 self.root_tk.destroy()
         else:

@@ -11,12 +11,13 @@ from urllib.error import HTTPError
 
 class YouTubeDownload:
 
-    def __init__(self, raw_url, temp_dl_loc, final_destination_dir: str, download_mp3=False):
+    def __init__(self, root_tk: tkinter.Tk, raw_url, temp_dl_loc, final_destination_dir: str, download_mp3=False):
         """
         :param raw_url: A YouTube URL to download
         :param final_destination_dir: The
         :param download_mp3:
         """
+        self.root_tk = root_tk
         self.raw_url = raw_url
         self.FINAL_DESTINATION_DIR = final_destination_dir
         self.TEMP_DOWNLOAD_LOC = temp_dl_loc
@@ -95,6 +96,10 @@ class YouTubeDownload:
         elif self.is_video_not_to_move():
             move_after_download = False
         else:
+            # Bring the tkinter window to the front of other windows.
+            self.root_tk.lift()
+
+            # Ask the user if they want to move the file regardless of it being larger than the limit.
             move_after_download = tkinter.messagebox.askyesno(title="Move File?", message=str(
                 self.output_file_path) + " is " + YouTubeDownload.sizeof_fmt(
                 output_file_size) + ". Do you still want to move it to " + str(self.FINAL_DESTINATION_DIR))
