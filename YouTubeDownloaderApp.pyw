@@ -87,6 +87,9 @@ class YouTubeDownloaderApp:
         :type url: A URL to be added to the download queue.
         :return: None
         """
+        if url == "":
+            tkinter.messagebox.showerror("No URL entered.", "Please enter a URL to download.")
+            return
 
         # If this URL is already in the downloads queue, ignore it and tell the user
         for dl_obj in list(self.downloads_queue):
@@ -206,17 +209,17 @@ class YouTubeDownloaderApp:
             if self.exit_after_downloads_bool_var.get():
                 self.root_tk.destroy()
 
-    def download_text_field_selected(self, text_var: tkinter.Text) -> None:
+    def download_text_field_selected(self, text_entry: tkinter.Text) -> None:
         """
         If the download Text field is selected when a valid download URL is on the clipboard,
         copy that value into the entry's StringVar.
-        :param text_var: The Entry associated with this entry.
+        :param text_entry: The Entry associated with this entry.
         :return: None
         """
         clipboard_val = self.root_tk.clipboard_get()
         if isinstance(clipboard_val, str):
-            text_var.delete(1.0, "end")
-            text_var.insert(1.0, clipboard_val)
+            text_entry.delete(1.0, "end")
+            text_entry.insert(1.0, clipboard_val)
 
     def init_gui(self) -> None:
         """
