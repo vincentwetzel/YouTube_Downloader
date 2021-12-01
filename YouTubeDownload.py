@@ -67,7 +67,7 @@ class YouTubeDownload:
             if result_successful:
                 break
             elif not result_successful and self.need_to_clear_download_cache:
-                for cache_clear_line in self.run_win_cmd("youtube-dl --rm-cache-dir"):
+                for cache_clear_line in self.run_win_cmd("yt-dlp --rm-cache-dir"):
                     logging.info(cache_clear_line)
                 logging.debug("Download cache clearing successful. Attempting to redo download...")
             else:
@@ -122,7 +122,7 @@ class YouTubeDownload:
 
     def determine_download_command(self) -> str:
         """
-        Figures out the correct youtube-dl command to run.
+        Figures out the correct yt-dlp command to run.
 
         :return:    A string with the correct download command.
         """
@@ -135,7 +135,7 @@ class YouTubeDownload:
         else:
             dl_format = ""
 
-        command = "youtube-dl --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
+        command = "yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
                                                                                                self.video_title.get().replace(
                                                                                                    '"', "'"),
                                                                                                ".%(ext)s"]) + "\" "
@@ -158,7 +158,7 @@ class YouTubeDownload:
         """
 
         # Get the video title
-        get_video_title_command = "youtube-dl --verbose --get-title --no-playlist \"" + self.raw_url + "\""
+        get_video_title_command = "yt-dlp --verbose --get-title --no-playlist \"" + self.raw_url + "\""
 
         vid_title = None
 
@@ -192,7 +192,7 @@ class YouTubeDownload:
 
     def run_youtube_dl_download(self, download_command) -> bool:
         """
-        This pipes a youtube-dl command into run_win_cmd().
+        This pipes a yt-dlp command into run_win_cmd().
         The purpose of running download commands this way is to be able to catch and handle errors.
 
         :return:    True if successful, false otherwise
@@ -223,7 +223,7 @@ class YouTubeDownload:
                     line.split("[download]")[1].strip().split(" has already")[0].strip())
                 logging.debug("VAL:" + str(self.output_file_path))
             if "[download] 100% of " in line:
-                # NOTE: youtube-dl refers to downloads as 100.0% until the file is completely downloaded.
+                # NOTE: yt-dlp refers to downloads as 100.0% until the file is completely downloaded.
                 download_successful = True
             if "[ffmpeg] Destination:" in line:
                 # When files are converted from video to audio

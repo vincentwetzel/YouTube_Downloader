@@ -1,7 +1,5 @@
 #! /usr/bin/env python3
 
-# TODO: Create a checkbox to allow the app to terminate when downloads complete.
-
 # NOTE TO USER: youtube-dl must be in the system PATH for this to run on Windows.
 # I recommend installing youtube-dl with PIP.
 from collections import deque
@@ -111,7 +109,7 @@ class YouTubeDownloaderApp:
                                                        message="Do you want to download this entire playlist?")
             if playlist_yes:
                 matches = []
-                for line in YouTubeDownload.run_win_cmd("youtube-dl --flat-playlist --dump-json \"" + url + "\""):
+                for line in YouTubeDownload.run_win_cmd("yt-dlp --flat-playlist --dump-json \"" + url + "\""):
                     if line[0] == "{":
                         line = str(line).strip('\n')
                         search_result = re.search(r'\"url\": \"(.*?)\"', line)
