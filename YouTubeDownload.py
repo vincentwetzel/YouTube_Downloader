@@ -26,7 +26,7 @@ class YouTubeDownload:
         self.video_title: tkinter.StringVar = tkinter.StringVar(value=self.raw_url)
         self.download_mp3 = download_mp3
         self.failed_download_attempts = 0
-        self.output_file_path = None
+        self.output_file_path: str = None
         """The path to the finished download file. This is calculated during the download."""
         self.YOUTUBE_DL_MP4_FORMATS = [137, 136, 398, 22]
         """
@@ -63,10 +63,13 @@ class YouTubeDownload:
             logging.info("DOWNLOAD COMMAND: " + download_command)
 
             # Run command to download the file
-            result_successful = self.run_youtube_dl_download(download_command)
-            if result_successful:
+            downloads_was_successful = self.run_youtube_dl_download(download_command)
+            if downloads_was_successful:
                 break
-            elif not result_successful and self.need_to_clear_download_cache:
+
+            # Sometimes downloads will fail because of the download cache.
+            # If that happens, clear the cache and attempt to download again.
+            elif not downloads_was_successful and self.need_to_clear_download_cache:
                 for cache_clear_line in self.run_win_cmd("yt-dlp --rm-cache-dir"):
                     logging.info(cache_clear_line)
                 logging.debug("Download cache clearing successful. Attempting to redo download...")
@@ -85,6 +88,11 @@ class YouTubeDownload:
                 # Catastrophic failure, kill the download
                 logging.info("After many tries, this download has failed.")
                 return False
+
+        # If the file is an mp3 then we need to modify the name of the output file once it is downloaded
+        # because our variable is tracking the video file, not the audio file
+        if self.download_mp3:
+            self.output_file_path = self.output_file_path.split(".")[0] + ".mp3"
 
         # Put the downloaded file in its proper location
         output_file_size = os.path.getsize(self.output_file_path)
@@ -136,9 +144,9 @@ class YouTubeDownload:
             dl_format = ""
 
         command = "yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
-                                                                                               self.video_title.get().replace(
-                                                                                                   '"', "'"),
-                                                                                               ".%(ext)s"]) + "\" "
+                                                                                           self.video_title.get().replace(
+                                                                                               '"', "'"),
+                                                                                           ".%(ext)s"]) + "\" "
         if self.download_mp3:
             # Audio downloads
             command += "--extract-audio --audio-format mp3 \"" + self.raw_url + "\""
@@ -233,7 +241,8 @@ class YouTubeDownload:
                 self.download_progress_string_var.set(re.search(r'[0-9]+\.[0-9]+', line).group(0))
             if "ERROR: unable to download video data: HTTP Error 403: Forbidden" in line:
                 self.need_to_clear_download_cache = True
-                return False
+                download_successful = False
+                break
 
         return download_successful
 
