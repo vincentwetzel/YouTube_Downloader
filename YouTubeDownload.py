@@ -156,7 +156,8 @@ class YouTubeDownload:
             # Video downloads
             command += "\"" + self.raw_url + "\""
 
-        command += " --windows-filenames "
+        # TODO: Handle the cookies-from-browser option better
+        command += " --windows-filenames --trim-filenames 150 --cookies-from-browser firefox --sponsorblock-remove sponsor"
         command += " && exit"
         return command
 
@@ -168,8 +169,9 @@ class YouTubeDownload:
         :return:    The title(s) of the video(s) to be downloaded as a list.
         """
 
+        # TODO: Handle the cookies-from-browser option better
         # Get the video title
-        get_video_title_command = "yt-dlp --verbose --get-title --no-playlist \"" + self.raw_url + "\""
+        get_video_title_command = "yt-dlp --verbose --get-title --cookies-from-browser firefox --no-playlist \"" + self.raw_url + "\""
 
         vid_title = None
 
