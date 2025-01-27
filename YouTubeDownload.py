@@ -97,7 +97,6 @@ class YouTubeDownload:
         # Put the downloaded file in its proper location
         output_file_size = os.path.getsize(self.output_file_path)
 
-        # noinspection PyUnusedLocal
         move_after_download = True
         if output_file_size < 209715200:  # 200 MB  # TODO: Modify this with a combobox box??
             move_after_download = True
@@ -116,10 +115,12 @@ class YouTubeDownload:
             shutil.move(self.output_file_path,
                         os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)))
             logging.info("\n" + str(self.output_file_path) + " moved to directory " + str(self.FINAL_DESTINATION_DIR))
+
         return True
 
     @staticmethod
     def check_to_see_if_playlist(url) -> bool:
+        # TODO: Verify if this is correct. Isn't it supposed to return a bool?
         """
         Strips a YouTube URL down to its most basic form.
         If the URL is for a playlist then this method has an option to retain that.
@@ -147,6 +148,7 @@ class YouTubeDownload:
                                                                                            self.video_title.get().replace(
                                                                                                '"', "'"),
                                                                                            ".%(ext)s"]) + "\" "
+
         if self.download_mp3:
             # Audio downloads
             command += "--extract-audio --audio-format mp3 \"" + self.raw_url + "\""
@@ -154,6 +156,7 @@ class YouTubeDownload:
             # Video downloads
             command += "\"" + self.raw_url + "\""
 
+        command += " --windows-filenames "
         command += " && exit"
         return command
 

@@ -19,6 +19,8 @@ import re
 logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 
+# TODO: Modify settings file (maybe full rewrite) to permit use of "" in path.
+
 class YouTubeDownloaderApp:
 
     def __init__(self):
@@ -116,7 +118,7 @@ class YouTubeDownloaderApp:
                         if search_result:
                             matches.append(search_result.group(1))
                 for match in matches:
-                    self.add_dls_to_queue("https://www.youtube.com/watch?v=" + match)
+                    self.add_dls_to_queue(match)
                 return
 
         # create YouTubeDownload object to store info about the download
