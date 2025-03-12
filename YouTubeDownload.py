@@ -28,14 +28,6 @@ class YouTubeDownload:
         self.failed_download_attempts = 0
         self.output_file_path: str = None
         """The path to the finished download file. This is calculated during the download."""
-        self.YOUTUBE_DL_MP4_FORMATS = [137, 136, 398, 22]
-        """
-        Some important numbers.
-        137          mp4        1920x1080  1080p 4752k , avc1.640028, 30fps, video only, 481.99MiB
-        398          mp4        1280x720   720p 1794k , av01.0.05M.08, 30fps, video only, 209.23MiB
-        136          mp4        1280x720   720p 2697k , avc1.4d401f, 30fps, video only, 260.78MiB
-        22           mp4        1280x720   hd720 1357k , avc1.64001F, mp4a.40.2@192k (44100Hz) (best)
-        """
 
         # Get a list of the files in the final output directory
         for idx, file in enumerate(self.output_dir_files):
@@ -135,15 +127,8 @@ class YouTubeDownload:
 
         :return:    A string with the correct download command.
         """
-        if self.failed_download_attempts == 0:
-            dl_format = "-f best[ext=mp4]/best"
-        elif self.failed_download_attempts == 1:
-            dl_format = "-f best"
-        elif self.failed_download_attempts < (2 + len(self.YOUTUBE_DL_MP4_FORMATS)):
-            dl_format = "-f " + str(self.YOUTUBE_DL_MP4_FORMATS[self.failed_download_attempts - 2])
-        else:
-            dl_format = ""
 
+        dl_format = r'-f "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best" --merge-output-format mp4'
         command = "yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
                                                                                            self.video_title.get().replace(
                                                                                                '"', "'"),
@@ -224,7 +209,7 @@ class YouTubeDownload:
                     merge_required = True
                 else:
                     self.output_file_path = os.path.realpath(line.split("[download] Destination: ")[1])
-            if "[ffmpeg] Merging formats into" in line:
+            if "Merging formats into" in line:
                 # Now add the new converted file
                 self.output_file_path = os.path.realpath(
                     line.split("\"")[1])  # Index 1 in this will give us the filename.
