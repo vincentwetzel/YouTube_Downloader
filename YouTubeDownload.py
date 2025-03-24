@@ -90,10 +90,12 @@ class YouTubeDownload:
         output_file_size = os.path.getsize(self.output_file_path)
 
         move_after_download = True
-        if output_file_size < 209715200:  # 200 MB  # TODO: Modify this with a combobox box??
-            move_after_download = True
-        elif self.is_video_not_to_move():
+
+        if os.path.dirname(self.output_file_path) == self.FINAL_DESTINATION_DIR:
+            logging.info("The final destination directory for this file is the same as the location that it was downloaded to so we don't have to move it.")
             move_after_download = False
+        elif output_file_size < 209715200:  # 200 MB  # TODO: Modify this with a combobox box??
+            move_after_download = True
         else:
             # Bring the tkinter window to the front of other windows.
             self.root_tk.lift()
@@ -274,16 +276,3 @@ class YouTubeDownload:
                 return "%3.1f%s%s" % (num, unit, suffix)
             num /= 1024.0
         return "%.1f%s%s" % (num, 'Yi', suffix)
-
-    def is_video_not_to_move(self) -> bool:
-        """
-        Determines if the video is a special case that should NOT be moved to Google Drive after downloading.
-        :return: True if a video title is a Starcraft video, False otherwise
-        """
-        phrases = ["GSL", "WCS", "ASL", "KSL", "ThePylonShow", "IEM Katowice", "Bannon's War Room"]
-
-        for tournament in phrases:
-            if tournament in self.video_title.get():
-                return True
-
-        return False
