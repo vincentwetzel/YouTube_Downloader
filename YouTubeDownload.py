@@ -84,7 +84,7 @@ class YouTubeDownload:
         # If the file is an mp3 then we need to modify the name of the output file once it is downloaded
         # because our variable is tracking the video file, not the audio file
         if self.download_mp3:
-            self.output_file_path = self.output_file_path.split(".")[0] + ".mp3"
+            self.output_file_path = os.path.splitext(self.output_file_path)[0] + ".mp3"
 
         # Put the downloaded file in its proper location
         output_file_size = os.path.getsize(self.output_file_path)
