@@ -92,7 +92,8 @@ class YouTubeDownload:
         move_after_download = True
 
         if os.path.dirname(self.output_file_path) == self.FINAL_DESTINATION_DIR:
-            logging.info("The final destination directory for this file is the same as the location that it was downloaded to so we don't have to move it.")
+            logging.info(
+                "The final destination directory for this file is the same as the location that it was downloaded to so we don't have to move it.")
             move_after_download = False
         elif output_file_size < 209715200:  # 200 MB  # TODO: Modify this with a combobox box??
             move_after_download = True
@@ -131,10 +132,8 @@ class YouTubeDownload:
         """
 
         dl_format = r'-S codec:h264:aac -f "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best" --merge-output-format mp4'
-        command = "yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join([self.TEMP_DOWNLOAD_LOC,
-                                                                                           self.video_title.get().replace(
-                                                                                               '"', "'"),
-                                                                                           ".%(ext)s"]) + "\" "
+        command = ("yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join(
+            [self.TEMP_DOWNLOAD_LOC, self.video_title.get().replace('"', "'"), " [%(id)s]", ".%(ext)s"]) + "\" ")
 
         if self.download_mp3:
             # Audio downloads
@@ -167,6 +166,11 @@ class YouTubeDownload:
             if "youtube_dl.utils.ExtractorError: This video has been removed by the user" in line:
                 self.video_doesnt_exist = True
                 return "ERROR: Video removed"
+
+            if "Confirm you are on the latest version" in line:
+                tkinter.messagebox.showerror("yt-dlp possibly out of date",
+                                             "yt-dlp is suggesting that it is not up to date. Please update it and try again.")
+                raise Exception("yt-dlp is suggesting that it is not up to date. Please update it and try again.")
 
             line = str(line).strip()
 
@@ -248,6 +252,8 @@ class YouTubeDownload:
         :param command: The command to run.
         :return: None
         """
+        logging.debug("WIN_CMD: " + command)
+
         # Note: errors="ignore" ignores special characters and returns the string without them.
         process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, errors="replace")

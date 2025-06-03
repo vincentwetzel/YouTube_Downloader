@@ -62,7 +62,7 @@ class YouTubeDownloaderApp:
         # Threading Variables
         self.threads: List[threading.Thread] = list()
         self.thread_monitoring_active = False
-        self.maximum_simultaneous_downloads: tkinter.IntVar = tkinter.IntVar(master=self.root_tk, value=2)
+        self.maximum_simultaneous_downloads: tkinter.IntVar = tkinter.IntVar(master=self.root_tk, value=4)
 
         # Download management variables
         """A deque of objects waiting to be downloaded"""
