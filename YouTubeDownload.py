@@ -6,7 +6,6 @@ import subprocess
 import tkinter
 import tkinter.messagebox
 from typing import Generator, List
-from urllib.error import HTTPError
 
 
 class YouTubeDownload:
@@ -26,7 +25,7 @@ class YouTubeDownload:
         self.video_title: tkinter.StringVar = tkinter.StringVar(value=self.raw_url)
         self.download_mp3 = download_mp3
         self.failed_download_attempts = 0
-        self.output_file_path: str = None
+        self.output_file_path: str = ""
         """The path to the finished download file. This is calculated during the download."""
 
         # Get a list of the files in the final output directory
@@ -81,7 +80,7 @@ class YouTubeDownload:
                 logging.info("After many tries, this download has failed.")
                 return False
 
-        # If the file is an mp3 then we need to modify the name of the output file once it is downloaded
+        # If the file is a mp3 then we need to modify the name of the output file once it is downloaded
         # because our variable is tracking the video file, not the audio file
         if self.download_mp3:
             self.output_file_path = os.path.splitext(self.output_file_path)[0] + ".mp3"
@@ -93,7 +92,8 @@ class YouTubeDownload:
 
         if os.path.dirname(self.output_file_path) == self.FINAL_DESTINATION_DIR:
             logging.info(
-                "The final destination directory for this file is the same as the location that it was downloaded to so we don't have to move it.")
+                "The final destination directory for this file is the same as the location "
+                "that it was downloaded to so we don't have to move it.")
             move_after_download = False
         elif output_file_size < 209715200:  # 200 MB  # TODO: Modify this with a combobox box??
             move_after_download = True
@@ -143,7 +143,8 @@ class YouTubeDownload:
             command += "\"" + self.raw_url + "\""
 
         # TODO: Handle the cookies-from-browser option better
-        command += " --windows-filenames --trim-filenames 150 --cookies-from-browser firefox --sponsorblock-remove sponsor"
+        command += (" --windows-filenames --trim-filenames 150 --cookies-from-browser firefox --embed-thumbnail"
+                    " --sponsorblock-remove sponsor")
         command += " && exit"
         return command
 
@@ -157,7 +158,8 @@ class YouTubeDownload:
 
         # TODO: Handle the cookies-from-browser option better
         # Get the video title
-        get_video_title_command = "yt-dlp --verbose --get-title --cookies-from-browser firefox --no-playlist \"" + self.raw_url + "\""
+        get_video_title_command = ("yt-dlp --verbose --get-title "
+                                   "--cookies-from-browser firefox --no-playlist \"") + self.raw_url + "\""
 
         vid_title = None
 
@@ -169,7 +171,8 @@ class YouTubeDownload:
 
             if "Confirm you are on the latest version" in line:
                 tkinter.messagebox.showerror("yt-dlp possibly out of date",
-                                             "yt-dlp is suggesting that it is not up to date. Please update it and try again.")
+                                             "yt-dlp is suggesting that it is not up to date. "
+                                             "Please update it and try again.")
                 raise Exception("yt-dlp is suggesting that it is not up to date. Please update it and try again.")
 
             line = str(line).strip()
@@ -233,7 +236,7 @@ class YouTubeDownload:
                 # When files are converted from video to audio
                 # then the original file has to be removed from output_filepaths.
                 self.output_file_path = os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip())
-            if re.search(r'^\[download\][\s]+[0-9]+\.[0-9]+%', line):
+            if re.search(r'^\[download]\s+[0-9]+\.[0-9]+%', line):
                 self.download_progress_string_var.set(re.search(r'[0-9]+\.[0-9]+', line).group(0))
             if "ERROR: unable to download video data: HTTP Error 403: Forbidden" in line:
                 self.need_to_clear_download_cache = True
