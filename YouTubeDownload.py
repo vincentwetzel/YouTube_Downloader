@@ -131,7 +131,11 @@ class YouTubeDownload:
         :return:    A string with the correct download command.
         """
 
-        dl_format = r'-S codec:h264:aac -f "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best" --merge-output-format mp4'
+        if self.download_mp3:
+            dl_format = r'-f bestaudio'
+        else:
+            dl_format = r'-S codec:h264:aac -f "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best" --merge-output-format mp4'
+
         command = ("yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join(
             [self.TEMP_DOWNLOAD_LOC, self.video_title.get().replace('"', "'"), " [%(id)s]", ".%(ext)s"]) + "\" ")
 
