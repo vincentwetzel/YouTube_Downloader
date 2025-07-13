@@ -178,6 +178,11 @@ class YouTubeDownload:
                                              "yt-dlp is suggesting that it is not up to date. "
                                              "Please update it and try again.")
                 raise Exception("yt-dlp is suggesting that it is not up to date. Please update it and try again.")
+            if "ios client https formats require a GVS PO Token which was not provided." in line:
+                tkinter.messagebox.showerror("yt-dlp is having an issue with grabbing cookies from web browser."
+                                             " Please verify that Firefox is correctly logged into YouTube.")
+                raise Exception("yt-dlp cannot grab cookies from web browser."
+                                " Please log into YouTube on Firefox again.")
 
             line = str(line).strip()
 
