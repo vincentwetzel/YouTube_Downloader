@@ -23,7 +23,7 @@ class YouTubeDownload:
         self.output_dir_files = os.listdir(
             self.FINAL_DESTINATION_DIR)
         self.video_title: tkinter.StringVar = tkinter.StringVar(value=self.raw_url)
-        self.download_mp3 = download_mp3
+        self.download_audio = download_mp3
         self.failed_download_attempts = 0
         self.output_file_path: str = ""
         """The path to the finished download file. This is calculated during the download."""
@@ -82,7 +82,7 @@ class YouTubeDownload:
 
         # If the file is a mp3 then we need to modify the name of the output file once it is downloaded
         # because our variable is tracking the video file, not the audio file
-        if self.download_mp3:
+        if self.download_audio:
             self.output_file_path = os.path.splitext(self.output_file_path)[0] + ".mp3"
 
         # Put the downloaded file in its proper location
@@ -131,15 +131,17 @@ class YouTubeDownload:
         :return:    A string with the correct download command.
         """
 
-        if self.download_mp3:
-            dl_format = r'-f bestaudio'
+        if self.download_audio:
+            dl_format = r'-f ba/best'
         else:
-            dl_format = r'-S codec:h264:aac -f "bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best" --merge-output-format mp4'
+            dl_format = (r' -f "bv+ba/best"'
+                         # r' --postprocessor-args "-c:v libx264 -preset fast -crf 23 -c:a aac -b:a 256k"'
+                         )
 
         command = ("yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join(
             [self.TEMP_DOWNLOAD_LOC, self.video_title.get().replace('"', "'"), " [%(id)s]", ".%(ext)s"]) + "\" ")
 
-        if self.download_mp3:
+        if self.download_audio:
             # Audio downloads
             command += "--extract-audio --audio-format mp3 \"" + self.raw_url + "\""
         else:
@@ -147,7 +149,9 @@ class YouTubeDownload:
             command += "\"" + self.raw_url + "\""
 
         # TODO: Handle the cookies-from-browser option better
-        command += (" --windows-filenames --trim-filenames 150 --cookies-from-browser firefox --embed-thumbnail"
+        command += (" --windows-filenames --trim-filenames 150 --cookies-from-browser firefox"
+                    " --embed-thumbnail"
+                    " --extractor-args \"youtube:sabr=on\""
                     " --sponsorblock-remove sponsor")
         command += " && exit"
         return command
