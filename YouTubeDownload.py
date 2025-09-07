@@ -147,7 +147,6 @@ class YouTubeDownload:
             # Video downloads
             command += "\"" + self.raw_url + "\""
 
-        # TODO: Handle the cookies-from-browser option better
         command += (" --windows-filenames --trim-filenames 150 --cookies-from-browser firefox"
                     " --embed-thumbnail"
                     " --extractor-args \"youtube:sabr=on\""
