@@ -132,14 +132,13 @@ class YouTubeDownload:
         """
 
         if self.download_audio:
-            dl_format = r'-f ba/best'
+            dl_format = r'-f ba/best --convert-thumbnails jpg'
         else:
-            dl_format = (r' -f "bv+ba/best"'
-                         # r' --postprocessor-args "-c:v libx264 -preset fast -crf 23 -c:a aac -b:a 256k"'
-                         )
+            dl_format = r' -f "bv*[vcodec^=avc]+ba*[acodec^=aac]/b[ext=mp4]" --merge-output-format mp4'
 
         command = ("yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join(
-            [self.TEMP_DOWNLOAD_LOC, self.video_title.get().replace('"', "'"), " [%(id)s]", ".%(ext)s"]) + "\" ")
+            [self.TEMP_DOWNLOAD_LOC, self.video_title.get().replace('"', "'"), " [%(id)s]",
+             " [%(upload_date>%Y-%m-%d)s]", ".%(ext)s"]) + "\" ")
 
         if self.download_audio:
             # Audio downloads
