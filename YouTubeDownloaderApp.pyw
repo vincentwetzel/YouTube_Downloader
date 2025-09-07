@@ -14,6 +14,7 @@ import logging
 import threading
 from YouTubeDownload import YouTubeDownload
 import re
+from tendo import singleton
 
 # NOTE TO USER: use logging.DEBUG for testing, logging.CRITICAL for runtime
 logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
@@ -373,4 +374,9 @@ class YouTubeDownloaderApp:
 
 
 if __name__ == "__main__":
+    try:
+        me = singleton.SingleInstance()
+    except singleton.SingleInstanceException:
+        print("Another instance of this app is already running. This will now exit.")
+        sys.exit(1)
     YouTubeDownloaderApp()
