@@ -335,8 +335,8 @@ class YouTubeDownloaderApp:
             need_to_rewrite_settings_ini = True
             tkinter.messagebox.showinfo(title="Choose a temporary download directory",
                                         message="Please choose a temporary directory to be used for ongoing downloads")
-            self.DOWNLOAD_TEMP_LOC = tkinter.filedialog.askdirectory(
-                title="Choose a temporary directory for ongoing downloads")
+            self.DOWNLOAD_TEMP_LOC = os.path.realpath(tkinter.filedialog.askdirectory(
+                title="Choose a temporary directory for ongoing downloads"))
 
         if need_to_rewrite_settings_ini:
             logging.info("Rewriting settings.ini...")

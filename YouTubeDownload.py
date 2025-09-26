@@ -85,27 +85,11 @@ class YouTubeDownload:
         if self.download_audio:
             self.output_file_path = os.path.splitext(self.output_file_path)[0] + ".mp3"
 
-        # Put the downloaded file in its proper location
-        output_file_size = os.path.getsize(self.output_file_path)
-
-        move_after_download = True
-
         if os.path.dirname(self.output_file_path) == self.FINAL_DESTINATION_DIR:
             logging.info(
                 "The final destination directory for this file is the same as the location "
                 "that it was downloaded to so we don't have to move it.")
-            move_after_download = False
-        elif output_file_size < 209715200:  # 200 MB  # TODO: Modify this with a combobox box??
-            move_after_download = True
         else:
-            # Bring the tkinter window to the front of other windows.
-            self.root_tk.lift()
-
-            # Ask the user if they want to move the file regardless of it being larger than the limit.
-            move_after_download = tkinter.messagebox.askyesno(title="Move File?", message=str(
-                self.output_file_path) + " is " + YouTubeDownload.sizeof_fmt(
-                output_file_size) + ". Do you still want to move it to " + str(self.FINAL_DESTINATION_DIR))
-        if move_after_download:
             # Move and replace the file if it already exists.
             shutil.move(self.output_file_path,
                         os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)))
@@ -126,87 +110,119 @@ class YouTubeDownload:
 
     def determine_download_command(self) -> str:
         """
-        Figures out the correct yt-dlp command to run.
-
-        :return:    A string with the correct download command.
+        Constructs a robust yt-dlp command with full control over output path and filename.
         """
 
+        # Format selection
         if self.download_audio:
-            dl_format = r'-f ba/best --convert-thumbnails jpg'
+            dl_format = '-f ba/best --convert-thumbnails jpg'
         else:
-            dl_format = r' -f "bv*[vcodec^=avc]+ba*[acodec^=aac]/b[ext=mp4]" --merge-output-format mp4'
+            dl_format = '-f "bv*[vcodec^=avc]+ba*[acodec^=aac]/b[ext=mp4]" --merge-output-format mp4'
 
-        command = ("yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join(
-            [self.TEMP_DOWNLOAD_LOC, self.video_title.get().replace('"', "'"), "[%(uploader)s]",
-             "[%(upload_date>%Y-%m-%d)s]", "[%(id)s]", ".%(ext)s"]) + "\" ")
+        # Filename template (truncated title, uploader, date, ID)
+        filename_template = "%(title).90s [%(uploader).30s][%(upload_date>%Y-%m-%d)s][%(id)s].%(ext)s"
 
+        # Full output path
+        full_output_path = os.path.normpath(
+            os.path.join(self.TEMP_DOWNLOAD_LOC, filename_template)
+        )
+
+        # Base command
+        command = (
+            f'yt-dlp --verbose --no-playlist {dl_format} '
+            f'-o "{full_output_path}" '
+        )
+
+        # Audio or video flags
         if self.download_audio:
-            # Audio downloads
-            command += "--extract-audio --audio-format mp3 \"" + self.raw_url + "\""
-        else:
-            # Video downloads
-            command += "\"" + self.raw_url + "\""
+            command += '--extract-audio --audio-format mp3 '
+        command += f'"{self.raw_url}" '
 
-        command += (" --windows-filenames --trim-filenames 150 --cookies-from-browser firefox"
-                    " --embed-thumbnail"
-                    " --extractor-args \"youtube:sabr=on\""
-                    " --sponsorblock-remove sponsor")
-        command += " && exit"
+        # Additional flags
+        command += (
+            '--windows-filenames '
+            '--trim-filenames 150 '
+            '--cookies-from-browser firefox '
+            '--embed-thumbnail '
+            '--extractor-args "youtube:sabr=on" '
+            '--sponsorblock-remove sponsor '
+            '&& exit'
+        )
+
         return command
 
     def get_video_title(self) -> str:
         """
-        Gets the title of the file(s) to be downloaded.
-        If the file(s) already exists in the output directory then ask for user input to handle the situation.
+        Retrieves the title of the video to be downloaded using yt-dlp.
+        Handles browser cookie issues, yt-dlp version warnings, and file collisions.
 
-        :return:    The title(s) of the video(s) to be downloaded as a list.
+        :return: Sanitized, ASCII-safe video title string.
         """
 
-        # TODO: Handle the cookies-from-browser option better
-        # Get the video title
-        get_video_title_command = ("yt-dlp --verbose --get-title "
-                                   "--cookies-from-browser firefox --no-playlist \"") + self.raw_url + "\""
+        # Build yt-dlp command to extract title
+        command = (
+            f'yt-dlp --print "%(title)s" '
+            f'--cookies-from-browser firefox '
+            f'--no-playlist "{self.raw_url}"'
+        )
 
-        vid_title = None
+        try:
+            for line in self.run_win_cmd(command):
+                line = str(line).strip()
+                logging.debug(f"yt-dlp output: {line}")
 
-        # Get the video title(s) for the file(s) we are downloading.
-        for line in self.run_win_cmd(get_video_title_command):
-            if "youtube_dl.utils.ExtractorError: This video has been removed by the user" in line:
-                self.video_doesnt_exist = True
-                return "ERROR: Video removed"
+                # Error: video removed
+                if "ExtractorError" in line or "This video has been removed" in line:
+                    self.video_doesnt_exist = True
+                    return "ERROR: Video removed"
 
-            if "Confirm you are on the latest version" in line:
-                tkinter.messagebox.showerror("yt-dlp possibly out of date",
-                                             "yt-dlp is suggesting that it is not up to date. "
-                                             "Please update it and try again.")
-                raise Exception("yt-dlp is suggesting that it is not up to date. Please update it and try again.")
-            if "ios client https formats require a GVS PO Token which was not provided." in line:
-                tkinter.messagebox.showerror("yt-dlp is having an issue with grabbing cookies from web browser."
-                                             " Please verify that Firefox is correctly logged into YouTube.")
-                raise Exception("yt-dlp cannot grab cookies from web browser."
-                                " Please log into YouTube on Firefox again.")
+                # Error: yt-dlp out of date
+                if "Confirm you are on the latest version" in line:
+                    tkinter.messagebox.showerror(
+                        "yt-dlp possibly out of date",
+                        "yt-dlp suggests it may be outdated. Please update and try again."
+                    )
+                    raise Exception("yt-dlp is out of date")
 
-            line = str(line).strip()
+                # Error: cookie issue
+                if "GVS PO Token" in line or "ios client https formats require" in line:
+                    tkinter.messagebox.showerror(
+                        "yt-dlp cookie issue",
+                        "yt-dlp cannot grab cookies from Firefox. Please re-login to YouTube."
+                    )
+                    raise Exception("yt-dlp cookie grab failed")
 
-            logging.debug(line)
+                # Skip empty lines
+                if not line:
+                    continue
 
-            vid_title = line
-            for c in ['/', '\\', ':', '*', '?', '\"', '<', '>', '|']:
-                if c in vid_title:
-                    vid_title = vid_title.replace(c, '_')
+                # Sanitize title
+                title = re.sub(r'[\/\\:*?"<>|]', '_', line)
+                title = title.encode("ascii", errors="ignore").decode()
+                title = title.replace("%", " percent").strip()
 
-            # If our download already exists, handle the situation.
-            if line in self.output_dir_files and self.redownload_video is None:
-                self.redownload_video = tkinter.messagebox.askyesno(title="File is already downloaded",
-                                                                    message="This file already exists in "
-                                                                            + str(self.FINAL_DESTINATION_DIR)
-                                                                            + ". Do you want to download it again?")
-                if self.redownload_video:
-                    logging.debug("Redownloading video...")
-        # Print the video title(s)
-        vid_title = vid_title.encode("ascii", errors="ignore").decode().replace("%", " percent").strip()
-        logging.info("VIDEO TITLE IS: " + vid_title)
-        return vid_title
+                # Truncate to safe length
+                max_chars = 180
+                if len(title) > max_chars:
+                    original = title
+                    title = title[:max_chars].rsplit(' ', 1)[0].strip()
+                    logging.info(f"Title truncated from {len(original)} to {len(title)} characters")
+
+                # Check for collision
+                if title in self.output_dir_files and self.redownload_video is None:
+                    self.redownload_video = tkinter.messagebox.askyesno(
+                        title="File already exists",
+                        message=f"This file already exists in {self.FINAL_DESTINATION_DIR}. Download again?"
+                    )
+                    if self.redownload_video:
+                        logging.debug("Redownloading video...")
+
+                logging.info(f"VIDEO TITLE IS: {title}")
+                return title
+
+        except Exception as e:
+            logging.error(f"Error retrieving video title: {e}")
+            return "ERROR: Title fetch failed"
 
     def run_youtube_dl_download(self, download_command) -> bool:
         """
