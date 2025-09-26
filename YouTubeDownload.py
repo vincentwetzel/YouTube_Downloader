@@ -137,8 +137,8 @@ class YouTubeDownload:
             dl_format = r' -f "bv*[vcodec^=avc]+ba*[acodec^=aac]/b[ext=mp4]" --merge-output-format mp4'
 
         command = ("yt-dlp --verbose --no-playlist " + str(dl_format) + " -o \"" + "".join(
-            [self.TEMP_DOWNLOAD_LOC, self.video_title.get().replace('"', "'"), " [%(id)s]",
-             " [%(upload_date>%Y-%m-%d)s]", ".%(ext)s"]) + "\" ")
+            [self.TEMP_DOWNLOAD_LOC, self.video_title.get().replace('"', "'"), "[%(uploader)s]",
+             "[%(upload_date>%Y-%m-%d)s]", "[%(id)s]", ".%(ext)s"]) + "\" ")
 
         if self.download_audio:
             # Audio downloads
