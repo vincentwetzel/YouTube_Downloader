@@ -33,7 +33,7 @@ class YouTubeDownload:
         # Get a list of the files in the final output directory
         for idx, file in enumerate(self.output_dir_files):
             self.output_dir_files[idx] = os.path.splitext(os.path.basename(file))[0].strip()
-        self.download_progress_string_var = tkinter.StringVar(value="0")
+        self.download_progress_str_var = tkinter.StringVar(value="0")
         self.redownload_video = None
         self.video_doesnt_exist = False
 
@@ -44,7 +44,7 @@ class YouTubeDownload:
         This is the main download method.
         :return: True if successful, false otherwise.
         """
-        self.video_title.set(self.get_video_title())
+        self.get_video_title()
 
         if self.video_doesnt_exist:
             return False
@@ -52,11 +52,12 @@ class YouTubeDownload:
         if not self.redownload_video and self.redownload_video is not None:
             return False
         while True:
-            download_command = self.determine_download_command()
-            logging.info("DOWNLOAD COMMAND: " + download_command)
+            download_opts = self.determine_download_options()
+            logging.info("DOWNLOAD OPTIONS:")
+            logging.info(download_opts)
 
             # Run command to download the file
-            downloads_was_successful = self.run_youtube_dl_download(download_command)
+            downloads_was_successful = self.run_youtube_dl_download(download_opts)
             if downloads_was_successful:
                 break
 
@@ -110,48 +111,65 @@ class YouTubeDownload:
         """
         return "list=" in url or "playlist" in url
 
-    def determine_download_command(self) -> str:
+    def determine_download_options(self) -> dict:
         """
-        Constructs a robust yt-dlp command with full control over output path and filename.
+        Constructs yt-dlp options as a Python dict instead of a CLI string.
+        This allows direct use with YoutubeDL() API.
         """
 
+        # ------------------------------
         # Format selection
+        # ------------------------------
         if self.download_audio:
-            dl_format = '-f ba/best --convert-thumbnails jpg'
+            # Audio-only: best audio, convert thumbnails to jpg
+            dl_format = 'ba/best'
         else:
-            dl_format = '-f "bv*[vcodec^=avc]+ba*[acodec^=aac]/b[ext=mp4]" --merge-output-format mp4'
+            # Video+audio: AVC video + AAC audio, fallback to mp4
+            dl_format = 'bv*[vcodec^=avc]+ba*[acodec^=aac]/b[ext=mp4]'
 
-        # Filename template (truncated title, uploader, date, ID)
+        # ------------------------------
+        # Filename template
+        # ------------------------------
         filename_template = "%(title).90s [%(uploader).30s][%(upload_date>%m-%d-%Y)s][%(id)s].%(ext)s"
-
-        # Full output path
         full_output_path = os.path.normpath(
             os.path.join(self.TEMP_DOWNLOAD_LOC, filename_template)
         )
 
-        # Base command
-        command = (
-            f'yt-dlp --verbose --no-playlist {dl_format} '
-            f'-o "{full_output_path}" '
-        )
+        # ------------------------------
+        # Base options dictionary
+        # ------------------------------
+        ydl_opts = {
+            'logger': LineLogger(),
+            'verbose': True,
+            'noplaylist': True,
+            'format': dl_format,
+            'outtmpl': full_output_path,
+            'windowsfilenames': True,
+            'trim_filenames': 150,
+            'cookiesfrombrowser': ('firefox',),  # tuple form required
+            'embedthumbnail': True,
+            'extractor_args': {'youtube': {'sabr': ['on']}},  # maps to --extractor-args "youtube:sabr=on"
+            'postprocessors': [],
+        }
 
-        # Audio or video flags
+        # ------------------------------
+        # Audio-specific flags
+        # ------------------------------
         if self.download_audio:
-            command += '--extract-audio --audio-format mp3 '
-        command += f'"{self.raw_url}" '
+            ydl_opts['extractaudio'] = True
+            ydl_opts['audioformat'] = 'mp3'
+            # Add thumbnail conversion postprocessor
+            ydl_opts['postprocessors'].append({
+                'key': 'FFmpegThumbnailsConvertor',
+                'format': 'jpg'
+            })
 
-        # Additional flags
-        command += (
-            '--windows-filenames '
-            '--trim-filenames 150 '
-            '--cookies-from-browser firefox '
-            '--embed-thumbnail '
-            '--extractor-args "youtube:sabr=on" '
-            '--sponsorblock-remove sponsor '
-            '&& exit'
-        )
+        # ------------------------------
+        # SponsorBlock removal
+        # ------------------------------
+        ydl_opts['sponsorblock_remove'] = ['sponsor']
 
-        return command
+        return ydl_opts
 
     def get_video_title(self) -> str:
         """
@@ -166,9 +184,8 @@ class YouTubeDownload:
                 'quiet': True,  # Suppress console output
                 'no_warnings': True,  # Suppress warnings
                 'restrictfilenames': True,  # Gets output filename the way it will be when I actually download it.
-                'cookiesfrombrowser': 'firefox',  # Use Firefox cookies for authentication
+                'cookiesfrombrowser': ('firefox',),  # Use Firefox cookies for authentication
                 'noplaylist': True,  # Ensure single video, not playlist
-                'forceprint': ['title'],  # Mimic --print "%(title)s"
                 'skip_download': True  # Don't download the video
             }
 
@@ -178,8 +195,8 @@ class YouTubeDownload:
                 self.output_file_name = ydl.prepare_filename(info)
 
             # Extract raw title from metadata
-            self.video_title = info.get('title', '')
-            logging.debug(f"yt-dlp raw title: {self.video_title}")
+            self.video_title.set(info.get('title', ''))
+            logging.debug(f"TITLE: {self.video_title.get()}")
 
             # If no title is found, raise an exception
             if not self.video_title:
@@ -197,9 +214,9 @@ class YouTubeDownload:
 
             # Log and return the final sanitized title
             return self.video_title
-
         except Exception as e:
             error_msg = str(e)
+            logging.error(error_msg)
 
             # Handle known error: video removed or unavailable
             if "ExtractorError" in error_msg or "This video has been removed" in error_msg:
@@ -212,67 +229,94 @@ class YouTubeDownload:
                     "yt-dlp possibly out of date",
                     "yt-dlp suggests it may be outdated. Please update and try again."
                 )
-                return "ERROR: Title fetch failed"
+                return "ERROR: Title fetch failed, possibly version is outdated"
 
-            # Handle known error: cookie grab failure
-            if "GVS PO Token" in error_msg or "ios client https formats require" in error_msg:
-                tkinter.messagebox.showerror(
-                    "yt-dlp cookie issue",
-                    "yt-dlp cannot grab cookies from Firefox. Please re-login to YouTube."
-                )
-                return "ERROR: Title fetch failed"
-
-            # Log any other unexpected errors
-            logging.error(f"Error retrieving video title: {error_msg}")
+            # All other cases
             return "ERROR: Title fetch failed"
 
-    def run_youtube_dl_download(self, download_command) -> bool:
+    def run_youtube_dl_download(self, ydl_opts: dict) -> bool:
         """
-        This pipes a yt-dlp command into run_win_cmd().
-        The purpose of running download commands this way is to be able to catch and handle errors.
+        Executes a yt-dlp download using the Python API.
+        Tracks progress, merge status, output path, and error conditions.
 
-        :return:    True if successful, false otherwise
+        :param ydl_opts: Dictionary of yt-dlp options (built by determine_download_options)
+        :return: True if successful, False otherwise
         """
 
-        merge_required = False
-        download_successful = False
+        # Reset state flags for each new download attempt
+        self.download_successful = False
+        self.output_file_path = None
 
-        for line in YouTubeDownload.run_win_cmd(download_command):
-            line = str(line).strip()  # Strip off \n from each line
-            logging.info(line)
-            if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
-                merge_required = True
-            if "[download] Destination: " in line and merge_required is False:
-                if re.search(r".f[0-9]{3}", line) is not None:
-                    merge_required = True
-                else:
-                    self.output_file_path = os.path.realpath(line.split("[download] Destination: ")[1])
-            if "Merging formats into" in line:
-                # Now add the new converted file
-                self.output_file_path = os.path.realpath(
-                    line.split("\"")[1])  # Index 1 in this will give us the filename.
-            if "has already been downloaded" in line:
-                logging.debug("LINE:" + line)
-                logging.debug(
-                    "LINE AFTER SPLIT:" + line.split("[download]")[1].strip().split(" has already")[0].strip())
-                self.output_file_path = os.path.realpath(
-                    line.split("[download]")[1].strip().split(" has already")[0].strip())
-                logging.debug("VAL:" + str(self.output_file_path))
-            if "[download] 100% of " in line:
-                # NOTE: yt-dlp refers to downloads as 100.0% until the file is completely downloaded.
-                download_successful = True
-            if "[ffmpeg] Destination:" in line:
-                # When files are converted from video to audio
-                # then the original file has to be removed from output_filepaths.
-                self.output_file_path = os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip())
-            if re.search(r'^\[download]\s+[0-9]+\.[0-9]+%', line):
-                self.download_progress_string_var.set(re.search(r'[0-9]+\.[0-9]+', line).group(0))
-            if "ERROR: unable to download video data: HTTP Error 403: Forbidden" in line:
+        # ------------------------------
+        # Define a progress hook callback
+        # ------------------------------
+        # yt-dlp calls this function repeatedly with a dict describing the current state.
+        # This replaces your old stdout parsing logic.
+        def progress_hook(d):
+            status = d.get('status')
+
+            # Case 1: Actively downloading
+            if status == 'downloading':
+                # yt-dlp provides a percent string like " 42.3%"
+                percent_str: str = d.get('_percent_str', '').strip()
+                if percent_str.endswith('%'):
+                    try:
+                        val = float(percent_str.replace('%', ''))
+                        if (val > float(self.download_progress_str_var.get()) or
+                                float(self.download_progress_str_var.get()) == 100.0):
+                            self.download_progress_str_var.set(val)
+                    except ValueError:
+                        pass
+
+            # Case 2: Download finished (file written to disk)
+            if status == 'finished':
+                filename = d.get('filename')
+                if filename:
+                    # Store the absolute path for later use
+                    self.output_file_path = os.path.realpath(filename)
+                    self.download_successful = True
+
+            # Case 3: Post-processing (merging formats, converting audio, etc.)
+            if status == 'postprocessing':
+                message = d.get('message', '')
+
+                # Detect when ffmpeg writes a new destination file
+                if 'Destination' in message:
+                    dest = message.split('Destination: ')[-1].strip()
+                    self.output_file_path = os.path.realpath(dest)
+
+            # Case 4: File already exists (yt-dlp skips download)
+            if status == 'already_downloaded':
+                filename = d.get('filename')
+                if filename:
+                    self.output_file_path = os.path.realpath(filename)
+                    self.download_successful = True
+
+        # Attach our hook to yt-dlp options
+        ydl_opts['progress_hooks'] = [progress_hook]
+
+        # ------------------------------
+        # Execute the download
+        # ------------------------------
+        try:
+            with YoutubeDL(ydl_opts) as ydl:
+                # This triggers the download and calls our hook repeatedly
+                ydl.download([self.raw_url])
+
+            # Return True if the hook marked the download as successful
+            return self.download_successful
+
+        except Exception as e:
+            error_msg = str(e)
+
+            # Special case: HTTP 403 errors often mean cache corruption
+            if "HTTP Error 403" in error_msg:
                 self.need_to_clear_download_cache = True
-                download_successful = False
-                break
+                self.download_successful = False
 
-        return download_successful
+            # Log any other error for forensic traceability
+            logging.error(f"Download error: {error_msg}")
+            return False
 
     @staticmethod
     def run_win_cmd(command: str) -> Generator[List[str], None, None]:
@@ -314,3 +358,16 @@ class YouTubeDownload:
                 return "%3.1f%s%s" % (num, unit, suffix)
             num /= 1024.0
         return "%.1f%s%s" % (num, 'Yi', suffix)
+
+
+class LineLogger:
+    def debug(self, msg):
+        if msg.strip():
+            # Replace carriage returns with real newlines
+            logging.info(msg.replace('\r', '\n'))
+
+    def warning(self, msg):
+        logging.warning(msg)
+
+    def error(self, msg):
+        logging.error(msg)

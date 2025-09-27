@@ -137,7 +137,7 @@ class YouTubeDownloaderApp:
         # Create new progress bar for this download
         self.downloads_queue_progress_bars_list.append(
             tkinter.ttk.Progressbar(master=self.downloads_queue_frame, orient="horizontal",
-                                    variable=download_obj.download_progress_string_var,
+                                    variable=download_obj.download_progress_str_var,
                                     length=self.PROGRESS_BAR_LENGTH))
         self.downloads_queue_progress_bars_list[-1].grid(column=1, row=len(self.downloads_queue_progress_bars_list) - 1,
                                                          sticky=tkinter.E)
