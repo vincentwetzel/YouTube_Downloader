@@ -31,6 +31,7 @@ class YouTubeDownload:
 
         # Get a list of the files in the final output directory
         self.download_progress_str_var = tkinter.StringVar(value="0")
+        self.total_download_size_in_bytes = 0
         self.download_successful = False
 
         self.need_to_clear_download_cache = False
@@ -61,6 +62,7 @@ class YouTubeDownload:
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(self.raw_url, download=False)
                 self.output_file_path = os.path.realpath(ydl.prepare_filename(info))
+                self.total_download_size_in_bytes = info.get("filesize")
 
                 # Check if the file already exists in the output directory
                 if os.path.splitext(os.path.basename(self.output_file_path))[0] in self.output_dir_files:
@@ -237,36 +239,35 @@ class YouTubeDownload:
         # ------------------------------
         # yt-dlp calls this function repeatedly with a dict describing the current state.
         # This replaces your old stdout parsing logic.
-        def progress_hook(d):
-            status = d.get('status')
+        def progress_hook(state_dict):
+            status = state_dict.get('status')
 
             # Case 1: Actively downloading
             if status == 'downloading':
                 # yt-dlp provides a percent string like " 42.3%"
-                percent_str: str = d.get('_percent_str', '').strip()
+                percent_str: str = state_dict.get('_percent_str', '').strip()
                 if percent_str.endswith('%'):
-                    try:
-                        val = float(percent_str.replace('%', ''))
-                        if (val > float(self.download_progress_str_var.get()) or
-                                float(self.download_progress_str_var.get()) == 100.0):
-                            self.download_progress_str_var.set(val)
-                    except ValueError:
-                        pass
+                    downloaded = state_dict.get('downloaded_bytes', 0)
+                    if self.total_download_size_in_bytes:
+                        percent = downloaded / self.total_download_size_in_bytes * 100
+                        # schedule update on Tk main thread
+                        self.root_tk.after(0, lambda: self.download_progress_str_var.set(percent))
 
             # Case 2: Download finished (file written to disk)
             if status == 'finished':
-                filename = d.get('filename')
+                self.download_progress_str_var = 100.0
+                filename = state_dict.get('filename')
                 if filename:
                     # Store the absolute path for later use
                     self.download_successful = True
 
             # Case 3: Post-processing (merging formats, converting audio, etc.)
             if status == 'postprocessing':
-                message = d.get('message', '')
+                message = state_dict.get('message', '')
 
             # Case 4: File already exists (yt-dlp skips download)
             if status == 'already_downloaded':
-                filename = d.get('filename')
+                filename = state_dict.get('filename')
                 if filename:
                     self.download_successful = True
 
