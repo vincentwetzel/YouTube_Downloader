@@ -75,11 +75,6 @@ class YouTubeDownload:
                         logging.info("Deleting failed download file: " + str(dir_item))
                         os.remove(os.path.join(self.TEMP_DOWNLOAD_LOC, dir_item))
 
-            if self.failed_download_attempts > 10:
-                # Catastrophic failure, kill the download
-                logging.info("After many tries, this download has failed.")
-                return False
-
         # Wait for the merged file to appear
         max_wait_time = 30  # seconds
         wait_interval = 1
