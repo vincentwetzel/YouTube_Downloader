@@ -133,6 +133,10 @@ class YouTubeDownloaderApp:
         download_obj = YouTubeDownload(self.root_tk, url, self.DOWNLOAD_TEMP_LOC,
                                        self.COMPLETED_DOWNLOADS_DIR,
                                        False if self.download_type.get() == "Video" else True)
+        threading.Thread(
+            target=lambda: self._resolve_title(download_obj),
+            daemon=True
+        ).start()
 
         # Create a GUI Label for the download's name
         self.downloads_queue_labels_list.append(
@@ -365,6 +369,16 @@ class YouTubeDownloaderApp:
                 self.root_tk.destroy()
         else:
             self.root_tk.destroy()
+
+    def _resolve_title(self, download_obj):
+        """
+        This process runs on a background thread to grab video titles as other actions are going on.
+        :param download_obj:
+        :return:
+        """
+        title = download_obj.get_video_title()
+        # schedule GUI update back on the Tkinter main thread
+        self.root_tk.after(0, lambda: self._update_queue_display(download_obj, title))
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import logging
 import shutil
 import re
 import subprocess
+import time
 import tkinter
 import tkinter.messagebox
 from typing import Generator, List
@@ -35,7 +36,6 @@ class YouTubeDownload:
         self.need_to_clear_download_cache = False
 
     def start_yt_download(self) -> bool:
-
         """
         Start a single yt-dlp download attempt using the Python API.
         Clears cache on 403 errors, updates state flags, and returns success/failure.
@@ -43,7 +43,14 @@ class YouTubeDownload:
 
         self.download_successful = False
 
-        if not self.get_video_title():
+        # Make sure the video title fetched correctly
+        counter = 0
+        while self.video_title == self.raw_url and counter < 10:
+            logging.debug("Video title has not been fetched yet. Sleeping for 5 seconds...")
+            time.sleep(5)
+            counter = counter + 1
+        if counter == 10:
+            logging.error("The download was unable to start because fetching the video title failed.")
             return False
 
         try:
