@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-
+import configparser
 # NOTE TO USER: youtube-dl must be in the system PATH for this to run on Windows.
 # I recommend installing youtube-dl with PIP.
 from collections import deque
@@ -287,62 +287,49 @@ class YouTubeDownloaderApp:
         tkinter.Checkbutton(self.notebook_frames[0], variable=self.exit_after_downloads_bool_var).grid(column=0, row=11)
 
     def init_settings(self):
-        """
-        Initializes the app by loading certain values from storage files.
-        :return: None
-        """
-        settings_lines = []
+        config = configparser.ConfigParser()
+        config.read("settings.ini")
         need_to_rewrite_settings_ini = False
 
-        print("FROM PYTHON:" + str(os.getcwd()))
-        if os.path.isfile("settings.ini"):
-            with open("settings.ini", 'r') as f:
-                settings_lines = f.readlines()
+        # Ensure section exists
+        if not config.has_section("Paths"):
+            config.add_section("Paths")
 
-        for line in settings_lines:
-            line = line.strip()
-            if "completed_downloads_directory=" in line:
-                self.COMPLETED_DOWNLOADS_DIR = os.path.realpath(line.split("=")[1])
-                if not os.path.exists(self.COMPLETED_DOWNLOADS_DIR):
-                    need_to_rewrite_settings_ini = True
-                    tkinter.messagebox.showinfo(title="settings.ini error",
-                                                message="settings.ini contains an invalid value "
-                                                        "for completed_downloads_directory. "
-                                                        "Please select an output folder for completed downloads.")
-                    self.COMPLETED_DOWNLOADS_DIR = tkinter.filedialog.askdirectory(
-                        title="Choose a directory for completed downloads")
-            elif "temporary_downloads_directory=" in line:
-                self.DOWNLOAD_TEMP_LOC = os.path.realpath(line.split("=")[1])
-                if not os.path.exists(self.DOWNLOAD_TEMP_LOC):
-                    need_to_rewrite_settings_ini = True
-                    tkinter.messagebox.showinfo(title="settings.ini error",
-                                                message="settings.ini contains an invalid value "
-                                                        "for temporary_downloads_directory. "
-                                                        "Please select a temporary folder for downloads.")
-                    self.DOWNLOAD_TEMP_LOC = tkinter.filedialog.askdirectory(
-                        title="Choose a temporary directory for ongoing downloads")
-            elif line == "":
-                pass
-            else:
-                need_to_rewrite_settings_ini = True
-        if self.COMPLETED_DOWNLOADS_DIR is None:
+        # Load and validate completed_downloads_directory
+        completed_dir = config.get("Paths", "completed_downloads_directory", fallback=None)
+        if completed_dir and os.path.exists(completed_dir):
+            self.COMPLETED_DOWNLOADS_DIR = os.path.realpath(completed_dir)
+        else:
             need_to_rewrite_settings_ini = True
-            tkinter.messagebox.showinfo(title="Choose a download directory",
-                                        message="Please select a download directory to use for completed downloads.")
+            tkinter.messagebox.showinfo(
+                title="Download Directory",
+                message="Please select a valid directory for completed downloads."
+            )
             self.COMPLETED_DOWNLOADS_DIR = tkinter.filedialog.askdirectory(
-                title="Choose a directory for completed downloads")
-        if self.DOWNLOAD_TEMP_LOC is None:
-            need_to_rewrite_settings_ini = True
-            tkinter.messagebox.showinfo(title="Choose a temporary download directory",
-                                        message="Please choose a temporary directory to be used for ongoing downloads")
-            self.DOWNLOAD_TEMP_LOC = os.path.realpath(tkinter.filedialog.askdirectory(
-                title="Choose a temporary directory for ongoing downloads"))
+                title="Choose a directory for completed downloads"
+            )
+            config.set("Paths", "completed_downloads_directory", self.COMPLETED_DOWNLOADS_DIR)
 
+        # Load and validate temporary_downloads_directory
+        temp_dir = config.get("Paths", "temporary_downloads_directory", fallback=None)
+        if temp_dir and os.path.exists(temp_dir):
+            self.DOWNLOAD_TEMP_LOC = os.path.realpath(temp_dir)
+        else:
+            need_to_rewrite_settings_ini = True
+            tkinter.messagebox.showinfo(
+                title="Temporary Directory",
+                message="Please select a valid temporary directory for downloads."
+            )
+            self.DOWNLOAD_TEMP_LOC = tkinter.filedialog.askdirectory(
+                title="Choose a temporary directory for ongoing downloads"
+            )
+            config.set("Paths", "temporary_downloads_directory", self.DOWNLOAD_TEMP_LOC)
+
+        # Rewrite settings.ini if needed
         if need_to_rewrite_settings_ini:
             logging.info("Rewriting settings.ini...")
-            with open("settings.ini", 'w') as new_file:
-                new_file.write("completed_downloads_directory=" + self.COMPLETED_DOWNLOADS_DIR + "\n")
-                new_file.write("temporary_downloads_directory=" + self.DOWNLOAD_TEMP_LOC)
+            with open("settings.ini", "w") as configfile:
+                config.write(configfile)
 
     def on_mousewheel(self, event: tkinter.Event):
         """
@@ -379,4 +366,15 @@ if __name__ == "__main__":
     except singleton.SingleInstanceException:
         print("Another instance of this app is already running. This will now exit.")
         sys.exit(1)
+
+    config = configparser.ConfigParser()
+
+    if not os.path.isfile("settings.ini"):
+        logging.info("settings.ini not found. Creating a new one.")
+        config.add_section("Paths")
+    else:
+        config.read("settings.ini")
+        if not config.has_section("Paths"):
+            config.add_section("Paths")
+
     YouTubeDownloaderApp()
