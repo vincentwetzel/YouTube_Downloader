@@ -30,7 +30,7 @@ class YouTubeDownload:
         """The path to the finished download file. This is calculated during the download."""
 
         # Get a list of the files in the final output directory
-        self.download_progress_str_var = tkinter.StringVar(value="0")
+        self.download_progress_dbl_var = tkinter.DoubleVar(value=0.0)
         self.total_download_size_in_bytes = 0
         self.download_successful = False
 
@@ -245,17 +245,16 @@ class YouTubeDownload:
             # Case 1: Actively downloading
             if status == 'downloading':
                 # yt-dlp provides a percent string like " 42.3%"
-                percent_str: str = state_dict.get('_percent_str', '').strip()
-                if percent_str.endswith('%'):
-                    downloaded = state_dict.get('downloaded_bytes', 0)
-                    if self.total_download_size_in_bytes:
-                        percent = downloaded / self.total_download_size_in_bytes * 100
-                        # schedule update on Tk main thread
-                        self.root_tk.after(0, lambda: self.download_progress_str_var.set(percent))
+                downloaded = state_dict.get('downloaded_bytes', 0)
+                logging.debug("self.total_download_size_in_bytes: " + str(self.total_download_size_in_bytes))
+                if self.total_download_size_in_bytes != 0:
+                    percent = downloaded / self.total_download_size_in_bytes * 100
+                    # schedule update on Tk main thread
+                    self.root_tk.after(0, lambda: self.download_progress_dbl_var.set(percent))
 
             # Case 2: Download finished (file written to disk)
             if status == 'finished':
-                self.download_progress_str_var = 100.0
+                self.download_progress_dbl_var = 100.0
                 filename = state_dict.get('filename')
                 if filename:
                     # Store the absolute path for later use
