@@ -21,13 +21,10 @@ class YouTubeDownload:
         self.raw_url = raw_url
         self.FINAL_DESTINATION_DIR = final_destination_dir
         self.TEMP_DOWNLOAD_LOC = temp_dl_loc
-        self.output_dir_files = os.listdir(
-            self.FINAL_DESTINATION_DIR)
+        self.output_dir_files = os.listdir(self.FINAL_DESTINATION_DIR)
         self.video_title: tkinter.StringVar = tkinter.StringVar(value=self.raw_url)
         self.download_audio = download_mp3
-        self.failed_download_attempts = 0
         self.output_file_path: str = ""
-        self.output_file_name: str = ""
         """The path to the finished download file. This is calculated during the download."""
 
         # Get a list of the files in the final output directory
@@ -35,8 +32,7 @@ class YouTubeDownload:
             self.output_dir_files[idx] = os.path.splitext(os.path.basename(file))[0].strip()
         self.download_progress_str_var = tkinter.StringVar(value="0")
         self.redownload_video = None
-        self.video_doesnt_exist = False
-        self.download_successful = None
+        self.download_successful = False
 
         self.need_to_clear_download_cache = False
 
@@ -62,15 +58,12 @@ class YouTubeDownload:
 
             with YoutubeDL(ydl_opts) as ydl:
                 ydl.download([self.raw_url])
-            # If we reach here without exception, mark success
-            self.download_successful = True
 
-            # Move and replace the file if it already exists.
-            logging.debug("self.output_file_path: " + self.output_file_path)
-            logging.debug("os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)): " + os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)))
-            shutil.move(self.output_file_path,
-                        os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)))
-            logging.debug("SHUTIL DONE!!!!!!!!!!")
+            if self.output_file_path:
+                final_path = os.path.join(self.FINAL_DOWNLOAD_LOC,
+                                          os.path.basename(self.output_file_path))
+                shutil.move(self.output_file_path, final_path)
+
             return True
 
         except Exception as e:
@@ -180,7 +173,7 @@ class YouTubeDownload:
             # Use yt-dlp's Python API to extract metadata
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(self.raw_url, download=False)
-                self.output_file_name = ydl.prepare_filename(info)
+                self.output_file_path = os.path.realpath(ydl.prepare_filename(info))
 
             # Extract raw title from metadata
             self.video_title.set(info.get('title', ''))
@@ -191,7 +184,7 @@ class YouTubeDownload:
                 raise Exception("No title found in metadata")
 
             # Check if the file already exists in the output directory
-            if self.output_file_name in self.output_dir_files and self.redownload_video is None:
+            if os.path.basename(self.output_file_path) in self.output_dir_files and self.redownload_video is None:
                 # Prompt user via GUI to confirm redownload
                 self.redownload_video = tkinter.messagebox.askyesno(
                     title="File already exists",
@@ -208,7 +201,6 @@ class YouTubeDownload:
 
             # Handle known error: video removed or unavailable
             if "ExtractorError" in error_msg or "This video has been removed" in error_msg:
-                self.video_doesnt_exist = True
                 return "ERROR: Video removed"
 
             # Handle known error: yt-dlp version outdated
@@ -261,7 +253,6 @@ class YouTubeDownload:
                 filename = d.get('filename')
                 if filename:
                     # Store the absolute path for later use
-                    self.output_file_path = os.path.realpath(filename)
                     self.download_successful = True
 
             # Case 3: Post-processing (merging formats, converting audio, etc.)
@@ -271,13 +262,11 @@ class YouTubeDownload:
                 # Detect when ffmpeg writes a new destination file
                 if 'Destination' in message:
                     dest = message.split('Destination: ')[-1].strip()
-                    self.output_file_path = os.path.realpath(dest)
 
             # Case 4: File already exists (yt-dlp skips download)
             if status == 'already_downloaded':
                 filename = d.get('filename')
                 if filename:
-                    self.output_file_path = os.path.realpath(filename)
                     self.download_successful = True
 
         # Attach our hook to yt-dlp options
