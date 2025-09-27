@@ -225,7 +225,6 @@ class YouTubeDownload:
 
         # Reset state flags for each new download attempt
         self.download_successful = False
-        self.output_file_path = None
 
         # ------------------------------
         # Define a progress hook callback
