@@ -19,36 +19,31 @@ class YouTubeDownload:
         """
         self.root_tk = root_tk
         self.raw_url = raw_url
-        self.FINAL_DESTINATION_DIR = final_destination_dir
+        self.FINAL_DESTINATION_DIR = os.path.realpath(final_destination_dir)
         self.TEMP_DOWNLOAD_LOC = temp_dl_loc
-        self.output_dir_files = os.listdir(self.FINAL_DESTINATION_DIR)
+        self.output_dir_files = [os.path.splitext(f)[0] for f in os.listdir(self.FINAL_DESTINATION_DIR) if
+                                 os.path.isfile(os.path.join(self.FINAL_DESTINATION_DIR, f))]
         self.video_title: tkinter.StringVar = tkinter.StringVar(value=self.raw_url)
         self.download_audio = download_mp3
         self.output_file_path: str = ""
         """The path to the finished download file. This is calculated during the download."""
 
         # Get a list of the files in the final output directory
-        for idx, file in enumerate(self.output_dir_files):
-            self.output_dir_files[idx] = os.path.splitext(os.path.basename(file))[0].strip()
         self.download_progress_str_var = tkinter.StringVar(value="0")
-        self.redownload_video = None
         self.download_successful = False
 
         self.need_to_clear_download_cache = False
 
     def start_yt_download(self) -> bool:
+
         """
         Start a single yt-dlp download attempt using the Python API.
         Clears cache on 403 errors, updates state flags, and returns success/failure.
         """
 
         self.download_successful = False
-        self.output_file_path = None
 
         if not self.get_video_title():
-            return False
-
-        if not self.redownload_video and self.redownload_video is not None:
             return False
 
         try:
@@ -57,10 +52,24 @@ class YouTubeDownload:
             logging.info(ydl_opts)
 
             with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(self.raw_url, download=False)
+                self.output_file_path = os.path.realpath(ydl.prepare_filename(info))
+
+                # Check if the file already exists in the output directory
+                if os.path.splitext(os.path.basename(self.output_file_path))[0] in self.output_dir_files:
+                    # Prompt user via GUI to confirm redownload
+                    if tkinter.messagebox.askyesno(
+                            title="File already exists",
+                            message=f"This file already exists in {self.FINAL_DESTINATION_DIR}. Download again?"
+                    ):
+                        logging.debug("Redownloading video...")
+                    else:
+                        return False
+
                 ydl.download([self.raw_url])
 
             if self.output_file_path:
-                final_path = os.path.join(self.FINAL_DOWNLOAD_LOC,
+                final_path = os.path.join(self.FINAL_DESTINATION_DIR,
                                           os.path.basename(self.output_file_path))
                 shutil.move(self.output_file_path, final_path)
 
@@ -183,16 +192,6 @@ class YouTubeDownload:
             if not self.video_title:
                 raise Exception("No title found in metadata")
 
-            # Check if the file already exists in the output directory
-            if os.path.basename(self.output_file_path) in self.output_dir_files and self.redownload_video is None:
-                # Prompt user via GUI to confirm redownload
-                self.redownload_video = tkinter.messagebox.askyesno(
-                    title="File already exists",
-                    message=f"This file already exists in {self.FINAL_DESTINATION_DIR}. Download again?"
-                )
-                if self.redownload_video:
-                    logging.debug("Redownloading video...")
-
             # Log and return the final sanitized title
             return self.video_title
         except Exception as e:
@@ -258,10 +257,6 @@ class YouTubeDownload:
             if status == 'postprocessing':
                 message = d.get('message', '')
 
-                # Detect when ffmpeg writes a new destination file
-                if 'Destination' in message:
-                    dest = message.split('Destination: ')[-1].strip()
-
             # Case 4: File already exists (yt-dlp skips download)
             if status == 'already_downloaded':
                 filename = d.get('filename')
@@ -293,32 +288,6 @@ class YouTubeDownload:
             # Log any other error for forensic traceability
             logging.error(f"Download error: {error_msg}")
             return False
-
-    @staticmethod
-    def run_win_cmd(command: str) -> Generator[List[str], None, None]:
-        """
-        Runs a command in a new cmd window.
-        This function ONLY works on Windows OS.
-        The values output in the CMD window are now piped through a generator.
-
-        :param command: The command to run.
-        :return: None
-        """
-        logging.debug("WIN_CMD: " + command)
-
-        # Note: errors="ignore" ignores special characters and returns the string without them.
-        process = subprocess.Popen(command, shell=True, encoding='utf-8', stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT, errors="replace")
-
-        # Yield stderr lines first so there aren't blank stdout lines fumbling around in the generator
-        # and stderr issues can be handled immediately.
-        for stdout_line in iter(process.stdout.readline, ""):
-            yield stdout_line
-
-        # Once the process has completed, get the return code to see if the process was successful.
-        return_code = process.wait()
-        if return_code != 0:
-            raise Exception('command %s failed, see above for details', command)
 
     def clear_yt_dlp_cache(self):
         try:

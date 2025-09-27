@@ -12,6 +12,9 @@ import tkinter.messagebox
 import tkinter.filedialog
 import logging
 import threading
+
+from yt_dlp import YoutubeDL
+
 from YouTubeDownload import YouTubeDownload
 import re
 from tendo import singleton
@@ -108,16 +111,20 @@ class YouTubeDownloaderApp:
 
         # handle playlist URLs
         if YouTubeDownload.check_to_see_if_playlist(url):
-            playlist_yes = tkinter.messagebox.askyesno(title="Download Playlist",
-                                                       message="Do you want to download this entire playlist?")
+            playlist_yes = tkinter.messagebox.askyesno(
+                title="Download Playlist",
+                message="Do you want to download this entire playlist?"
+            )
             if playlist_yes:
                 matches = []
-                for line in YouTubeDownload.run_win_cmd("yt-dlp --flat-playlist --dump-json \"" + url + "\""):
-                    if line[0] == "{":
-                        line = str(line).strip('\n')
-                        search_result = re.search(r'\"url\": \"(.*?)\"', line)
-                        if search_result:
-                            matches.append(search_result.group(1))
+                ydl_opts = {"quiet": True, "extract_flat": True}  # flat = don’t resolve full video info
+                with YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    # info['entries'] is a list of dicts, each with 'url' and 'id'
+                    for entry in info.get("entries", []):
+                        if "url" in entry:
+                            matches.append(entry["url"])
+
                 for match in matches:
                     self.add_dls_to_queue(match)
                 return
