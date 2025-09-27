@@ -110,13 +110,9 @@ class YouTubeDownload:
             # yt-dlp provides a percent string like " 42.3%"
             downloaded = state_dict.get('downloaded_bytes', 0)
             if self.total_download_size_in_bytes != 0 and self.total_download_size_in_bytes != downloaded:
-                logging.debug("downloaded: " + str(downloaded))
-                logging.debug("self.total_download_size_in_bytes: " + str(self.total_download_size_in_bytes))
                 percent:float = downloaded / self.total_download_size_in_bytes * 100
-                logging.debug("Percent: " + str(percent))
                 if percent > self.download_progress_dbl_var.get():
                     # schedule update on Tk main thread
-                    logging.debug("IF EXECUTED!!!!!!!!")
                     self.root_tk.after(0, lambda: self.download_progress_dbl_var.set(percent))
 
         # Case 2: Download finished (file written to disk)
