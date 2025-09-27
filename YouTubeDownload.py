@@ -54,44 +54,9 @@ class YouTubeDownload:
             logging.error("The download was unable to start because fetching the video title failed.")
             return False
 
-        def progress_hook(self, state_dict):
-            status = state_dict.get('status')
-            self.total_download_size_in_bytes = (
-                    state_dict.get("total_bytes") or state_dict.get("total_bytes_estimate")
-            )
-            logging.debug("self.total_download_size_in_bytes:" + str(self.total_download_size_in_bytes))
-
-            # Case 1: Actively downloading
-            if status == 'downloading':
-                # yt-dlp provides a percent string like " 42.3%"
-                downloaded = state_dict.get('downloaded_bytes', 0)
-                logging.debug("self.total_download_size_in_bytes: " + str(self.total_download_size_in_bytes))
-                if self.total_download_size_in_bytes != 0:
-                    percent = downloaded / self.total_download_size_in_bytes * 100
-                    # schedule update on Tk main thread
-                    self.root_tk.after(0, lambda: self.download_progress_dbl_var.set(percent))
-
-            # Case 2: Download finished (file written to disk)
-            if status == 'finished':
-                self.download_progress_dbl_var = 100.0
-                filename = state_dict.get('filename')
-                if filename:
-                    # Store the absolute path for later use
-                    self.download_successful = True
-
-            # Case 3: Post-processing (merging formats, converting audio, etc.)
-            if status == 'postprocessing':
-                message = state_dict.get('message', '')
-
-            # Case 4: File already exists (yt-dlp skips download)
-            if status == 'already_downloaded':
-                filename = state_dict.get('filename')
-                if filename:
-                    self.download_successful = True
-
         try:
             ydl_opts = self.determine_download_options()
-            ydl_opts["progress_hooks"] = [progress_hook]
+            ydl_opts["progress_hooks"] = [self.progress_hook]
             logging.info("DOWNLOAD OPTIONS:")
             logging.info(ydl_opts)
 
@@ -133,6 +98,44 @@ class YouTubeDownload:
 
             # No retries, fail fast
             return False
+
+    def progress_hook(self, state_dict):
+        status = state_dict.get('status')
+        self.total_download_size_in_bytes = (
+                state_dict.get("total_bytes") or state_dict.get("total_bytes_estimate")
+        )
+
+        # Case 1: Actively downloading
+        if status == 'downloading':
+            # yt-dlp provides a percent string like " 42.3%"
+            downloaded = state_dict.get('downloaded_bytes', 0)
+            if self.total_download_size_in_bytes != 0 and self.total_download_size_in_bytes != downloaded:
+                logging.debug("downloaded: " + str(downloaded))
+                logging.debug("self.total_download_size_in_bytes: " + str(self.total_download_size_in_bytes))
+                percent:float = downloaded / self.total_download_size_in_bytes * 100
+                logging.debug("Percent: " + str(percent))
+                if percent > self.download_progress_dbl_var.get():
+                    # schedule update on Tk main thread
+                    logging.debug("IF EXECUTED!!!!!!!!")
+                    self.root_tk.after(0, lambda: self.download_progress_dbl_var.set(percent))
+
+        # Case 2: Download finished (file written to disk)
+        if status == 'finished':
+            self.download_progress_dbl_var = 100.0
+            filename = state_dict.get('filename')
+            if filename:
+                # Store the absolute path for later use
+                self.download_successful = True
+
+        # Case 3: Post-processing (merging formats, converting audio, etc.)
+        if status == 'postprocessing':
+            message = state_dict.get('message', '')
+
+        # Case 4: File already exists (yt-dlp skips download)
+        if status == 'already_downloaded':
+            filename = state_dict.get('filename')
+            if filename:
+                self.download_successful = True
 
     @staticmethod
     def check_to_see_if_playlist(url) -> bool:
