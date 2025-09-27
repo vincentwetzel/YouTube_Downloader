@@ -6,7 +6,7 @@ import subprocess
 import tkinter
 import tkinter.messagebox
 from typing import Generator, List
-import time
+
 
 class YouTubeDownload:
 
@@ -75,30 +75,22 @@ class YouTubeDownload:
                         logging.info("Deleting failed download file: " + str(dir_item))
                         os.remove(os.path.join(self.TEMP_DOWNLOAD_LOC, dir_item))
 
-        # Wait for the merged file to appear
-        max_wait_time = 30  # seconds
-        wait_interval = 1
-        waited = 0
-
-        while not os.path.exists(self.output_file_path) and waited < max_wait_time:
-            logging.info(f"Waiting for merged file: {self.output_file_path}")
-            time.sleep(wait_interval)
-            waited += wait_interval
-
-        if not os.path.exists(self.output_file_path):
-            logging.error("Merged output file never appeared. Aborting move.")
-            return False
+            if self.failed_download_attempts > 10:
+                # Catastrophic failure, kill the download
+                logging.info("After many tries, this download has failed.")
+                return False
 
         # If the file is a mp3 then we need to modify the name of the output file once it is downloaded
         # because our variable is tracking the video file, not the audio file
+        if self.download_audio:
+            self.output_file_path = os.path.splitext(self.output_file_path)[0] + ".mp3"
+
         if os.path.dirname(self.output_file_path) == self.FINAL_DESTINATION_DIR:
             logging.info(
                 "The final destination directory for this file is the same as the location "
                 "that it was downloaded to so we don't have to move it.")
         else:
             # Move and replace the file if it already exists.
-            print("self.FINAL_DESTINATION_DIR:" + self.FINAL_DESTINATION_DIR)
-            print("os.path.basename(self.output_file_path):" + os.path.basename(self.output_file_path))
             shutil.move(self.output_file_path,
                         os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)))
             logging.info("\n" + str(self.output_file_path) + " moved to directory " + str(self.FINAL_DESTINATION_DIR))
@@ -128,10 +120,10 @@ class YouTubeDownload:
             dl_format = '-f "bv*[vcodec^=avc]+ba*[acodec^=aac]/b[ext=mp4]" --merge-output-format mp4'
 
         # Filename template (truncated title, uploader, date, ID)
-        filename_template = "%(title).90s [%(uploader).30s][%(upload_date>%m-%d-%Y)s][%(id)s].%(ext)s"
+        filename_template = "%(title).90s [%(uploader).30s][%(upload_date>%Y-%m-%d)s][%(id)s].%(ext)s"
 
         # Full output path
-        full_output_path  = os.path.normpath(
+        full_output_path = os.path.normpath(
             os.path.join(self.TEMP_DOWNLOAD_LOC, filename_template)
         )
 
@@ -166,6 +158,7 @@ class YouTubeDownload:
 
         :return: Sanitized, ASCII-safe video title string.
         """
+
         # Build yt-dlp command to extract title
         command = (
             f'yt-dlp --print "%(title)s" '
@@ -239,15 +232,23 @@ class YouTubeDownload:
         :return:    True if successful, false otherwise
         """
 
+        merge_required = False
         download_successful = False
 
         for line in YouTubeDownload.run_win_cmd(download_command):
             line = str(line).strip()  # Strip off \n from each line
             logging.info(line)
-            if "Destination: " + self.FINAL_DESTINATION_DIR in line:
-                logging.error("found it!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                self.output_file_path = line.split("Destination:")[1].strip()
-                break
+            if "WARNING: Requested formats are incompatible for merge and will be merged into" in line:
+                merge_required = True
+            if "[download] Destination: " in line and merge_required is False:
+                if re.search(r".f[0-9]{3}", line) is not None:
+                    merge_required = True
+                else:
+                    self.output_file_path = os.path.realpath(line.split("[download] Destination: ")[1])
+            if "Merging formats into" in line:
+                # Now add the new converted file
+                self.output_file_path = os.path.realpath(
+                    line.split("\"")[1])  # Index 1 in this will give us the filename.
             if "has already been downloaded" in line:
                 logging.debug("LINE:" + line)
                 logging.debug(
@@ -258,6 +259,10 @@ class YouTubeDownload:
             if "[download] 100% of " in line:
                 # NOTE: yt-dlp refers to downloads as 100.0% until the file is completely downloaded.
                 download_successful = True
+            if "[ffmpeg] Destination:" in line:
+                # When files are converted from video to audio
+                # then the original file has to be removed from output_filepaths.
+                self.output_file_path = os.path.realpath(line.split("[ffmpeg] Destination: ")[1].strip())
             if re.search(r'^\[download]\s+[0-9]+\.[0-9]+%', line):
                 self.download_progress_string_var.set(re.search(r'[0-9]+\.[0-9]+', line).group(0))
             if "ERROR: unable to download video data: HTTP Error 403: Forbidden" in line:
