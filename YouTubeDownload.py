@@ -36,69 +36,57 @@ class YouTubeDownload:
         self.download_progress_str_var = tkinter.StringVar(value="0")
         self.redownload_video = None
         self.video_doesnt_exist = False
+        self.download_successful = None
 
         self.need_to_clear_download_cache = False
 
     def start_yt_download(self) -> bool:
         """
-        This is the main download method.
-        :return: True if successful, false otherwise.
+        Start a single yt-dlp download attempt using the Python API.
+        Clears cache on 403 errors, updates state flags, and returns success/failure.
         """
-        self.get_video_title()
 
-        if self.video_doesnt_exist:
+        self.download_successful = False
+        self.output_file_path = None
+
+        if not self.get_video_title():
             return False
 
         if not self.redownload_video and self.redownload_video is not None:
             return False
-        while True:
-            download_opts = self.determine_download_options()
+
+        try:
+            ydl_opts = self.determine_download_options()
             logging.info("DOWNLOAD OPTIONS:")
-            logging.info(download_opts)
+            logging.info(ydl_opts)
 
-            # Run command to download the file
-            downloads_was_successful = self.run_youtube_dl_download(download_opts)
-            if downloads_was_successful:
-                break
+            with YoutubeDL(ydl_opts) as ydl:
+                ydl.download([self.raw_url])
+            # If we reach here without exception, mark success
+            self.download_successful = True
 
-            # Sometimes downloads will fail because of the download cache.
-            # If that happens, clear the cache and attempt to download again.
-            elif not downloads_was_successful and self.need_to_clear_download_cache:
-                for cache_clear_line in self.run_win_cmd("yt-dlp --rm-cache-dir"):
-                    logging.info(cache_clear_line)
-                logging.debug("Download cache clearing successful. Attempting to redo download...")
-            else:
-                logging.info("Download attempt #" + str(self.failed_download_attempts + 1) + " failed.")
-                self.failed_download_attempts += 1
-
-                # Clear any .part files that might be associated with the failed download.
-                download_dir_list = os.listdir(self.TEMP_DOWNLOAD_LOC)
-                for dir_item in download_dir_list:
-                    if self.video_title.get() in dir_item:
-                        logging.info("Deleting failed download file: " + str(dir_item))
-                        os.remove(os.path.join(self.TEMP_DOWNLOAD_LOC, dir_item))
-
-            if self.failed_download_attempts > 10:
-                # Catastrophic failure, kill the download
-                logging.info("After many tries, this download has failed.")
-                return False
-
-        # If the file is a mp3 then we need to modify the name of the output file once it is downloaded
-        # because our variable is tracking the video file, not the audio file
-        if self.download_audio:
-            self.output_file_path = os.path.splitext(self.output_file_path)[0] + ".mp3"
-
-        if os.path.dirname(self.output_file_path) == self.FINAL_DESTINATION_DIR:
-            logging.info(
-                "The final destination directory for this file is the same as the location "
-                "that it was downloaded to so we don't have to move it.")
-        else:
             # Move and replace the file if it already exists.
+            logging.debug("self.output_file_path: " + self.output_file_path)
+            logging.debug("os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)): " + os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)))
             shutil.move(self.output_file_path,
                         os.path.join(self.FINAL_DESTINATION_DIR, os.path.basename(self.output_file_path)))
-            logging.info("\n" + str(self.output_file_path) + " moved to directory " + str(self.FINAL_DESTINATION_DIR))
+            logging.debug("SHUTIL DONE!!!!!!!!!!")
+            return True
 
-        return True
+        except Exception as e:
+            logging.error(f"Download failed: {e}")
+
+            # Handle specific transient case: HTTP 403 (stale cookies/cache)
+            if "HTTP Error 403" in str(e):
+                try:
+                    with YoutubeDL({}) as ydl:
+                        ydl.cache.remove()
+                    logging.info("yt-dlp cache cleared after 403 error.")
+                except Exception as cache_err:
+                    logging.error(f"Failed to clear yt-dlp cache: {cache_err}")
+
+            # No retries, fail fast
+            return False
 
     @staticmethod
     def check_to_see_if_playlist(url) -> bool:
@@ -343,6 +331,14 @@ class YouTubeDownload:
         return_code = process.wait()
         if return_code != 0:
             raise Exception('command %s failed, see above for details', command)
+
+    def clear_yt_dlp_cache(self):
+        try:
+            with YoutubeDL({}) as ydl:
+                ydl.cache.remove()
+            logging.info("yt-dlp cache cleared successfully.")
+        except Exception as e:
+            logging.error(f"Failed to clear yt-dlp cache: {e}")
 
     @staticmethod
     def sizeof_fmt(num: int, suffix='B') -> str:
