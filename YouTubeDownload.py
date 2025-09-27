@@ -120,7 +120,7 @@ class YouTubeDownload:
             dl_format = '-f "bv*[vcodec^=avc]+ba*[acodec^=aac]/b[ext=mp4]" --merge-output-format mp4'
 
         # Filename template (truncated title, uploader, date, ID)
-        filename_template = "%(title).90s [%(uploader).30s][%(upload_date>%Y-%m-%d)s][%(id)s].%(ext)s"
+        filename_template = "%(title).90s [%(uploader).30s][%(upload_date>%m-%d-%Y)s][%(id)s].%(ext)s"
 
         # Full output path
         full_output_path = os.path.normpath(
