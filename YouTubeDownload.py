@@ -54,15 +54,50 @@ class YouTubeDownload:
             logging.error("The download was unable to start because fetching the video title failed.")
             return False
 
+        def progress_hook(self, state_dict):
+            status = state_dict.get('status')
+            self.total_download_size_in_bytes = (
+                    state_dict.get("total_bytes") or state_dict.get("total_bytes_estimate")
+            )
+            logging.debug("self.total_download_size_in_bytes:" + str(self.total_download_size_in_bytes))
+
+            # Case 1: Actively downloading
+            if status == 'downloading':
+                # yt-dlp provides a percent string like " 42.3%"
+                downloaded = state_dict.get('downloaded_bytes', 0)
+                logging.debug("self.total_download_size_in_bytes: " + str(self.total_download_size_in_bytes))
+                if self.total_download_size_in_bytes != 0:
+                    percent = downloaded / self.total_download_size_in_bytes * 100
+                    # schedule update on Tk main thread
+                    self.root_tk.after(0, lambda: self.download_progress_dbl_var.set(percent))
+
+            # Case 2: Download finished (file written to disk)
+            if status == 'finished':
+                self.download_progress_dbl_var = 100.0
+                filename = state_dict.get('filename')
+                if filename:
+                    # Store the absolute path for later use
+                    self.download_successful = True
+
+            # Case 3: Post-processing (merging formats, converting audio, etc.)
+            if status == 'postprocessing':
+                message = state_dict.get('message', '')
+
+            # Case 4: File already exists (yt-dlp skips download)
+            if status == 'already_downloaded':
+                filename = state_dict.get('filename')
+                if filename:
+                    self.download_successful = True
+
         try:
             ydl_opts = self.determine_download_options()
+            ydl_opts["progress_hooks"] = [progress_hook]
             logging.info("DOWNLOAD OPTIONS:")
             logging.info(ydl_opts)
 
             with YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(self.raw_url, download=False)
                 self.output_file_path = os.path.realpath(ydl.prepare_filename(info))
-                self.total_download_size_in_bytes = info.get("filesize")
 
                 # Check if the file already exists in the output directory
                 if os.path.splitext(os.path.basename(self.output_file_path))[0] in self.output_dir_files:
@@ -221,80 +256,6 @@ class YouTubeDownload:
 
             # All other cases
             return "ERROR: Title fetch failed"
-
-    def run_youtube_dl_download(self, ydl_opts: dict) -> bool:
-        """
-        Executes a yt-dlp download using the Python API.
-        Tracks progress, merge status, output path, and error conditions.
-
-        :param ydl_opts: Dictionary of yt-dlp options (built by determine_download_options)
-        :return: True if successful, False otherwise
-        """
-
-        # Reset state flags for each new download attempt
-        self.download_successful = False
-
-        # ------------------------------
-        # Define a progress hook callback
-        # ------------------------------
-        # yt-dlp calls this function repeatedly with a dict describing the current state.
-        # This replaces your old stdout parsing logic.
-        def progress_hook(state_dict):
-            status = state_dict.get('status')
-
-            # Case 1: Actively downloading
-            if status == 'downloading':
-                # yt-dlp provides a percent string like " 42.3%"
-                downloaded = state_dict.get('downloaded_bytes', 0)
-                logging.debug("self.total_download_size_in_bytes: " + str(self.total_download_size_in_bytes))
-                if self.total_download_size_in_bytes != 0:
-                    percent = downloaded / self.total_download_size_in_bytes * 100
-                    # schedule update on Tk main thread
-                    self.root_tk.after(0, lambda: self.download_progress_dbl_var.set(percent))
-
-            # Case 2: Download finished (file written to disk)
-            if status == 'finished':
-                self.download_progress_dbl_var = 100.0
-                filename = state_dict.get('filename')
-                if filename:
-                    # Store the absolute path for later use
-                    self.download_successful = True
-
-            # Case 3: Post-processing (merging formats, converting audio, etc.)
-            if status == 'postprocessing':
-                message = state_dict.get('message', '')
-
-            # Case 4: File already exists (yt-dlp skips download)
-            if status == 'already_downloaded':
-                filename = state_dict.get('filename')
-                if filename:
-                    self.download_successful = True
-
-        # Attach our hook to yt-dlp options
-        ydl_opts['progress_hooks'] = [progress_hook]
-
-        # ------------------------------
-        # Execute the download
-        # ------------------------------
-        try:
-            with YoutubeDL(ydl_opts) as ydl:
-                # This triggers the download and calls our hook repeatedly
-                ydl.download([self.raw_url])
-
-            # Return True if the hook marked the download as successful
-            return self.download_successful
-
-        except Exception as e:
-            error_msg = str(e)
-
-            # Special case: HTTP 403 errors often mean cache corruption
-            if "HTTP Error 403" in error_msg:
-                self.need_to_clear_download_cache = True
-                self.download_successful = False
-
-            # Log any other error for forensic traceability
-            logging.error(f"Download error: {error_msg}")
-            return False
 
     def clear_yt_dlp_cache(self):
         try:
