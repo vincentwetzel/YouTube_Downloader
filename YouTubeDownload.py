@@ -6,6 +6,7 @@ import subprocess
 import tkinter
 import tkinter.messagebox
 from typing import Generator, List
+from yt_dlp import YoutubeDL
 
 
 class YouTubeDownload:
@@ -26,6 +27,7 @@ class YouTubeDownload:
         self.download_audio = download_mp3
         self.failed_download_attempts = 0
         self.output_file_path: str = ""
+        self.output_file_name: str = ""
         """The path to the finished download file. This is calculated during the download."""
 
         # Get a list of the files in the final output directory
@@ -153,75 +155,75 @@ class YouTubeDownload:
 
     def get_video_title(self) -> str:
         """
-        Retrieves the title of the video to be downloaded using yt-dlp.
+        Retrieves the title of the video to be downloaded using yt-dlp's Python API.
         Handles browser cookie issues, yt-dlp version warnings, and file collisions.
 
         :return: Sanitized, ASCII-safe video title string.
         """
-
-        # Build yt-dlp command to extract title
-        command = (
-            f'yt-dlp --print "%(title)s" '
-            f'--cookies-from-browser firefox '
-            f'--no-playlist "{self.raw_url}"'
-        )
-
         try:
-            for line in self.run_win_cmd(command):
-                line = str(line).strip()
-                logging.debug(f"yt-dlp output: {line}")
+            # Define yt-dlp options to extract metadata only (no download)
+            ydl_opts = {
+                'quiet': True,  # Suppress console output
+                'no_warnings': True,  # Suppress warnings
+                'restrictfilenames': True,  # Gets output filename the way it will be when I actually download it.
+                'cookiesfrombrowser': 'firefox',  # Use Firefox cookies for authentication
+                'noplaylist': True,  # Ensure single video, not playlist
+                'forceprint': ['title'],  # Mimic --print "%(title)s"
+                'skip_download': True  # Don't download the video
+            }
 
-                # Error: video removed
-                if "ExtractorError" in line or "This video has been removed" in line:
-                    self.video_doesnt_exist = True
-                    return "ERROR: Video removed"
+            # Use yt-dlp's Python API to extract metadata
+            with YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(self.raw_url, download=False)
+                self.output_file_name = ydl.prepare_filename(info)
 
-                # Error: yt-dlp out of date
-                if "Confirm you are on the latest version" in line:
-                    tkinter.messagebox.showerror(
-                        "yt-dlp possibly out of date",
-                        "yt-dlp suggests it may be outdated. Please update and try again."
-                    )
-                    raise Exception("yt-dlp is out of date")
+            # Extract raw title from metadata
+            self.video_title = info.get('title', '')
+            logging.debug(f"yt-dlp raw title: {self.video_title}")
 
-                # Error: cookie issue
-                if "GVS PO Token" in line or "ios client https formats require" in line:
-                    tkinter.messagebox.showerror(
-                        "yt-dlp cookie issue",
-                        "yt-dlp cannot grab cookies from Firefox. Please re-login to YouTube."
-                    )
-                    raise Exception("yt-dlp cookie grab failed")
+            # If no title is found, raise an exception
+            if not self.video_title:
+                raise Exception("No title found in metadata")
 
-                # Skip empty lines
-                if not line:
-                    continue
+            # Check if the file already exists in the output directory
+            if self.output_file_name in self.output_dir_files and self.redownload_video is None:
+                # Prompt user via GUI to confirm redownload
+                self.redownload_video = tkinter.messagebox.askyesno(
+                    title="File already exists",
+                    message=f"This file already exists in {self.FINAL_DESTINATION_DIR}. Download again?"
+                )
+                if self.redownload_video:
+                    logging.debug("Redownloading video...")
 
-                # Sanitize title
-                title = re.sub(r'[\/\\:*?"<>|]', '_', line)
-                title = title.encode("ascii", errors="ignore").decode()
-                title = title.replace("%", " percent").strip()
-
-                # Truncate to safe length
-                max_chars = 180
-                if len(title) > max_chars:
-                    original = title
-                    title = title[:max_chars].rsplit(' ', 1)[0].strip()
-                    logging.info(f"Title truncated from {len(original)} to {len(title)} characters")
-
-                # Check for collision
-                if title in self.output_dir_files and self.redownload_video is None:
-                    self.redownload_video = tkinter.messagebox.askyesno(
-                        title="File already exists",
-                        message=f"This file already exists in {self.FINAL_DESTINATION_DIR}. Download again?"
-                    )
-                    if self.redownload_video:
-                        logging.debug("Redownloading video...")
-
-                logging.info(f"VIDEO TITLE IS: {title}")
-                return title
+            # Log and return the final sanitized title
+            return self.video_title
 
         except Exception as e:
-            logging.error(f"Error retrieving video title: {e}")
+            error_msg = str(e)
+
+            # Handle known error: video removed or unavailable
+            if "ExtractorError" in error_msg or "This video has been removed" in error_msg:
+                self.video_doesnt_exist = True
+                return "ERROR: Video removed"
+
+            # Handle known error: yt-dlp version outdated
+            if "Confirm you are on the latest version" in error_msg:
+                tkinter.messagebox.showerror(
+                    "yt-dlp possibly out of date",
+                    "yt-dlp suggests it may be outdated. Please update and try again."
+                )
+                return "ERROR: Title fetch failed"
+
+            # Handle known error: cookie grab failure
+            if "GVS PO Token" in error_msg or "ios client https formats require" in error_msg:
+                tkinter.messagebox.showerror(
+                    "yt-dlp cookie issue",
+                    "yt-dlp cannot grab cookies from Firefox. Please re-login to YouTube."
+                )
+                return "ERROR: Title fetch failed"
+
+            # Log any other unexpected errors
+            logging.error(f"Error retrieving video title: {error_msg}")
             return "ERROR: Title fetch failed"
 
     def run_youtube_dl_download(self, download_command) -> bool:
