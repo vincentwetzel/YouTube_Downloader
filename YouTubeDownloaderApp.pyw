@@ -4,8 +4,7 @@ import configparser
 # I recommend installing youtube-dl with PIP.
 from collections import deque
 from typing import List
-import os
-import sys
+import os, sys, subprocess
 import tkinter
 import tkinter.ttk
 import tkinter.messagebox
@@ -16,7 +15,6 @@ import threading
 from yt_dlp import YoutubeDL
 
 from YouTubeDownload import YouTubeDownload
-import re
 from tendo import singleton
 
 from urllib.parse import urlparse, parse_qs
