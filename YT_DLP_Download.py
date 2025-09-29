@@ -131,3 +131,5 @@ class YT_DLP_Download(QObject):
         # yt-dlp doesn’t have a clean cancel hook, but we can flag it
         self._cancelled = True
         self.status_updated.emit("Cancel requested (will stop after current operation).")
+
+pass
