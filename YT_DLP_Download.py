@@ -68,8 +68,11 @@ class YT_DLP_Download(QObject):
             os.makedirs(self.temp_dl_loc, exist_ok=True)
             os.makedirs(self.final_destination_dir, exist_ok=True)
 
-            # File naming template
-            outtmpl = os.path.join(self.temp_dl_loc, "%(title)s.%(ext)s")
+            # File naming template: truncated title, uploader, MM-DD-YYYY, ID
+            outtmpl = os.path.join(
+                self.temp_dl_loc,
+                "%(title).80s [%(uploader)][%(upload_date>%m-%d-%Y)][%(id)].%(ext)s"
+            )
 
             # yt-dlp options
             ydl_opts = {
@@ -77,6 +80,8 @@ class YT_DLP_Download(QObject):
                 "progress_hooks": [self._progress_hook],
                 "quiet": True,
                 "no_warnings": True,
+                "restrictfilenames": True,
+                "noplaylist": True,
             }
 
             if self.download_mp3:
@@ -87,7 +92,8 @@ class YT_DLP_Download(QObject):
                     "preferredquality": "192",
                 }]
             else:
-                ydl_opts["format"] = "bestvideo+bestaudio/best"
+                ydl_opts["format"] = "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
+                ydl_opts["merge_output_format"] = "mp4"
 
             # Download
             self.status_updated.emit("Starting download...")
