@@ -20,6 +20,11 @@ from PyQt6.QtWidgets import (
     QFrame
 )
 
+SUPPORTED_DOMAINS = [
+    "youtube.com", "youtu.be", "twitter.com", "x.com",
+    "tiktok.com", "vimeo.com", "soundcloud.com"
+]
+
 from YT_DLP_Download import YT_DLP_Download
 
 
@@ -37,6 +42,36 @@ def qt_message_handler(mode, context, message):
 QtCore.qInstallMessageHandler(qt_message_handler)
 
 SETTINGS_FILE = "settings.ini"
+
+
+class UrlAwareTextEdit(QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptRichText(False)
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        self._replace_with_clipboard_url()
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self._replace_with_clipboard_url()
+
+    def _replace_with_clipboard_url(self):
+        text = QApplication.clipboard().text().strip()
+        if "\n" in text:
+            text = text.splitlines()[0].strip()  # only take first line
+
+        if self._is_supported_url(text):
+            # 🔽 Always clear and replace with clipboard URL
+            self.clear()
+            self.setPlainText(text)
+
+    def _is_supported_url(self, text: str) -> bool:
+        if not text.startswith(("http://", "https://")):
+            return False
+        tl = text.lower()
+        return any(domain in tl for domain in SUPPORTED_DOMAINS)
 
 
 class DownloadWorker(QThread):
@@ -78,7 +113,7 @@ class MainWindow(QWidget):
 
         self.tabs.addTab(self.tab_new, "New Download")
         self.tabs.addTab(self.tab_active, "Active Downloads")
-        self.tabs.addTab(self.tab_settings, "Settings")
+        self.tabs.addTab(self.tab_settings, "Advanced Settings")
 
         # Layout
         layout = QVBoxLayout()
@@ -89,57 +124,6 @@ class MainWindow(QWidget):
         self.max_threads = int(self.max_threads_combo.currentText())
         self.active_downloads = []  # [(worker, backend, widgets_dict)]
 
-    def _setup_tab_new(self):
-        layout = QVBoxLayout()
-
-        # URL input
-        self.url_label = QLabel("Video/Playlist URL(s):")
-        self.url_input = QTextEdit()
-        self.url_input.setPlaceholderText("Paste one or more URLs here...")
-        self.url_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
-        self.url_input.setFixedHeight(100)
-
-        # Big download button
-        self.download_btn = QPushButton("Download")
-        self.download_btn.setFixedHeight(100)
-        self.download_btn.setMinimumWidth(150)
-        self.download_btn.clicked.connect(self.on_download)
-
-        url_row = QHBoxLayout()
-        url_row.addWidget(self.url_input, stretch=1)
-        url_row.addWidget(self.download_btn)
-
-        # Audio + Max threads (side by side)
-        self.audio_checkbox = QCheckBox("Download audio (mp3)")
-        self.max_threads_label = QLabel("Max simultaneous downloads:")
-        self.max_threads_combo = QComboBox()
-        self.max_threads_combo.addItems(["1", "2", "3", "4"])
-        self.max_threads_combo.setCurrentText(self.config["General"].get("max_threads", "2"))
-        self.max_threads_combo.currentTextChanged.connect(self.on_threads_changed)
-
-        options_row = QHBoxLayout()
-        options_row.addWidget(self.audio_checkbox)
-        options_row.addWidget(self.max_threads_label)
-        options_row.addWidget(self.max_threads_combo)
-        options_row.addStretch()
-
-        # Open folder button (bigger)
-        self.open_folder_btn = QPushButton("Open Downloads Folder")
-        self.open_folder_btn.setMinimumHeight(40)
-        self.open_folder_btn.setStyleSheet("font-weight: bold;")
-        self.open_folder_btn.clicked.connect(self.on_open_folder)
-
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-        btn_row.addWidget(self.open_folder_btn)
-
-        layout.addWidget(self.url_label)
-        layout.addLayout(url_row)
-        layout.addLayout(options_row)
-        layout.addLayout(btn_row)
-
-        self.tab_new.setLayout(layout)
-
     # -----------------------------
     # Tab 1: New Download
     # -----------------------------
@@ -148,7 +132,7 @@ class MainWindow(QWidget):
 
         # URL input
         self.url_label = QLabel("Video/Playlist URL(s):")
-        self.url_input = QTextEdit()
+        self.url_input = UrlAwareTextEdit()
         self.url_input.setPlaceholderText("Paste one or more URLs here...")
         self.url_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self.url_input.setFixedHeight(100)
@@ -282,6 +266,8 @@ class MainWindow(QWidget):
         outdir = self.outdir_display.text().strip()
         tempdir = self.temp_display.text().strip()
         audio_only = self.audio_checkbox.isChecked()
+
+        self.tabs.setCurrentWidget(self.tab_active)
 
         for url in urls:
             worker = DownloadWorker(url, tempdir, outdir, audio_only)
