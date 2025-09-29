@@ -132,6 +132,7 @@ class YouTubeDownload:
             filename = state_dict.get('filename')
             if filename:
                 self.download_successful = True
+                self.download_progress_dbl_var = 100.0
 
     @staticmethod
     def check_to_see_if_playlist(url) -> bool:
