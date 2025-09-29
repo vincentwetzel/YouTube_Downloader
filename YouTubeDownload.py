@@ -135,15 +135,19 @@ class YouTubeDownload:
                 self.download_progress_dbl_var = 100.0
 
     @staticmethod
-    def check_to_see_if_playlist(url) -> bool:
-        # TODO: Verify if this is correct. Isn't it supposed to return a bool?
-        """
-        Strips a YouTube URL down to its most basic form.
-        If the URL is for a playlist then this method has an option to retain that.
-        :param url: a YouTube URL to
-        :return: True if it is a playlist, False otherwise
-        """
-        return "list=" in url or "playlist" in url
+    def is_playlist(url: str) -> bool:
+        ydl_opts = {
+            'quiet': True,
+            'skip_download': True,
+        }
+        with YoutubeDL(ydl_opts) as ydl:
+            try:
+                info = ydl.extract_info(url, download=False)
+                logging.debug("-------------->>>>>>>>>>PLAYLIST DETECTION: " + str(info.get('_type') == 'playlist'))
+                logging.debug("URL: " + url)
+                return info.get('_type') == 'playlist' or 'playlist' in info or 'playlist_id' in info or 'playlist_title' in info
+            except Exception:
+                return False
 
     def determine_download_options(self) -> dict:
         """

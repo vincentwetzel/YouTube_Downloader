@@ -19,6 +19,8 @@ from YouTubeDownload import YouTubeDownload
 import re
 from tendo import singleton
 
+from urllib.parse import urlparse, parse_qs
+
 # NOTE TO USER: use logging.DEBUG for testing, logging.CRITICAL for runtime
 logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
@@ -85,82 +87,143 @@ class YouTubeDownloaderApp:
         self.init_settings()
         self.root_tk.mainloop()
 
-    def add_dls_to_queue(self, url: str) -> None:
-        """
-        Adds a URL to the download queue and attempts to start it.
-        :type url: A URL to be added to the download queue.
-        :return: None
-        """
-        if url == "":
+    def enque_downloads(self, dl_url: str) -> None:
+        # Check for empty input
+        if dl_url == "":
             tkinter.messagebox.showerror("No URL entered.", "Please enter a URL to download.")
             return
 
-        # If this URL is already in the downloads queue, ignore it and tell the user
+        # Check if the URL is already in the downloads queue
         for dl_obj in list(self.downloads_queue):
-            if url == dl_obj.raw_url:
-                tkinter.messagebox.showerror(title="ERROR: Download already exists",
-                                             message="This download is already in the queue!")
+            if dl_url == dl_obj.raw_url:
+                tkinter.messagebox.showerror("ERROR: Download already exists",
+                                             "This download is already in the queue!")
                 return
 
-        # If this URL is currently being downloaded, ignore it and tell the user
+        # Check if the URL is currently being downloaded
         for dl_obj in self.active_dl_objs_list:
-            if url == dl_obj.raw_url:
-                tkinter.messagebox.showerror(title="ERROR: Download already exists",
-                                             message="This item is currently being downloaded!")
+            if dl_url == dl_obj.raw_url:
+                tkinter.messagebox.showerror("ERROR: Download already exists",
+                                             "This item is currently being downloaded!")
                 return
 
-        # handle playlist URLs
-        if YouTubeDownload.check_to_see_if_playlist(url):
-            playlist_yes = tkinter.messagebox.askyesno(
-                title="Download Playlist",
-                message="Do you want to download this entire playlist?"
-            )
-            if playlist_yes:
-                matches = []
-                ydl_opts = {"quiet": True, "extract_flat": True}  # flat = don’t resolve full video info
-                with YoutubeDL(ydl_opts) as ydl:
-                    info = ydl.extract_info(url, download=False)
-                    # info['entries'] is a list of dicts, each with 'url' and 'id'
-                    for entry in info.get("entries", []):
-                        if "url" in entry:
-                            matches.append(entry["url"])
+        # ✅ Nested function to handle playlist detection and expansion
+        def playlist_worker():
+            # Use yt-dlp to check if the URL is a playlist
+            if YouTubeDownload.is_playlist(dl_url):
+                # GUI prompt must run on the main thread
+                def ask_user():
+                    # Create a custom dialog window
+                    dialog = tkinter.Toplevel(self.root_tk)
+                    dialog.title("Download Options")
+                    dialog.grab_set()  # make modal
 
-                for match in matches:
-                    self.add_dls_to_queue(match)
-                return
+                    msg = "This video is part of a playlist.\nWhat would you like to do?"
+                    label = tkinter.Label(dialog, text=msg, justify="center", padx=20, pady=10)
+                    label.pack()
 
-        # create YouTubeDownload object to store info about the download
-        download_obj = YouTubeDownload(self.root_tk, url, self.DOWNLOAD_TEMP_LOC,
-                                       self.COMPLETED_DOWNLOADS_DIR,
-                                       False if self.download_type.get() == "Video" else True)
-        threading.Thread(
-            target=lambda: download_obj.get_video_title(),
-            daemon=True
-        ).start()
+                    choice = {"value": None}
 
-        # Create a GUI Label for the download's name
-        self.downloads_queue_labels_list.append(
-            tkinter.Label(self.downloads_queue_frame, textvariable=download_obj.video_title, anchor=tkinter.W,
-                          justify=tkinter.LEFT, width=70, wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50))
-        self.downloads_queue_labels_list[-1].grid(column=0, row=len(
-            self.downloads_queue_progress_bars_list), sticky=(tkinter.W, tkinter.E))
-        print(str(self.downloads_queue_labels_list))
-        # Create new progress bar for this download
-        self.downloads_queue_progress_bars_list.append(
-            tkinter.ttk.Progressbar(master=self.downloads_queue_frame, orient="horizontal",
-                                    variable=download_obj.download_progress_dbl_var,
-                                    length=self.PROGRESS_BAR_LENGTH))
-        self.downloads_queue_progress_bars_list[-1].grid(column=1, row=len(self.downloads_queue_progress_bars_list) - 1,
-                                                         sticky=tkinter.E)
+                    def set_choice(val):
+                        choice["value"] = val
+                        dialog.destroy()
 
-        # Append the new download to the downloads queue
-        self.downloads_queue.append(download_obj)
-        logging.info(url + " has been added to the download queue")
+                    # Frame to hold buttons side by side
+                    btn_frame = tkinter.Frame(dialog)
+                    btn_frame.pack(pady=10)
 
-        # Move the GUI to the downloads tab
+                    tkinter.Button(btn_frame, text="Download Full Playlist",
+                                   command=lambda: set_choice("playlist")).pack(side="left", padx=5)
+                    tkinter.Button(btn_frame, text="Download Only This Video",
+                                   command=lambda: set_choice("single")).pack(side="left", padx=5)
+                    tkinter.Button(btn_frame, text="Cancel",
+                                   command=lambda: set_choice("cancel")).pack(side="left", padx=5)
+
+                    dialog.wait_window()  # wait until dialog is closed
+
+                    # Handle the user’s choice
+                    if choice["value"] == "playlist":
+                        def expand_worker():
+                            try:
+                                matches = []
+                                ydl_opts = {"quiet": True, "extract_flat": True}
+                                playlist_url = self.normalize_to_playlist(dl_url)
+                                with YoutubeDL(ydl_opts) as ydl:
+                                    info = ydl.extract_info(playlist_url, download=False)
+                                    if "entries" not in info:
+                                        logging.warning("No entries found — URL resolved as single video")
+                                        return
+                                    for entry in info["entries"]:
+                                        if "url" in entry:
+                                            matches.append(entry["url"])
+                                for match in matches:
+                                    self.create_dl_obj(match)
+                            except Exception:
+                                logging.exception("Playlist expansion failed")
+
+                        threading.Thread(target=expand_worker, daemon=True).start()
+                        return
+
+                    elif choice["value"] == "single":
+                        self.create_dl_obj(dl_url)
+
+
+                    elif choice["value"] == "cancel":
+                        pass
+
+                # Schedule GUI prompt on the main thread
+                self.root_tk.after(0, ask_user)
+
+            else:
+                # If not a playlist, proceed with normal single-video logic
+                self.root_tk.after(0, lambda: self.create_dl_obj(dl_url))
+
+        # Run playlist detection and expansion in a background thread
+        threading.Thread(target=playlist_worker, daemon=True).start()
+
+    def create_dl_obj(self, dl_url: str):
+        # Create a YouTubeDownload object to manage this download
+        dl_obj = YouTubeDownload(
+            self.root_tk,
+            dl_url,
+            self.DOWNLOAD_TEMP_LOC,
+            self.COMPLETED_DOWNLOADS_DIR,
+            False if self.download_type.get() == "Video" else True
+        )
+
+        # Start a background thread to fetch the video title
+        threading.Thread(target=lambda: dl_obj.get_video_title(), daemon=True).start()
+
+        # Create a label in the GUI for this download
+        label = tkinter.Label(
+            self.downloads_queue_frame,
+            textvariable=dl_obj.video_title,
+            anchor=tkinter.W,
+            justify=tkinter.LEFT,
+            width=70,
+            wraplength=self.WINDOW_WIDTH - self.PROGRESS_BAR_LENGTH - 50
+        )
+        self.downloads_queue_labels_list.append(label)
+        label.grid(column=0, row=len(self.downloads_queue_progress_bars_list), sticky=(tkinter.W, tkinter.E))
+
+        # Create a progress bar for this download
+        progress = tkinter.ttk.Progressbar(
+            master=self.downloads_queue_frame,
+            orient="horizontal",
+            variable=dl_obj.download_progress_dbl_var,
+            length=self.PROGRESS_BAR_LENGTH
+        )
+        self.downloads_queue_progress_bars_list.append(progress)
+        progress.grid(column=1, row=len(self.downloads_queue_progress_bars_list) - 1, sticky=tkinter.E)
+
+        # Add the download object to the queue
+        self.downloads_queue.append(dl_obj)
+        logging.info(dl_url + " has been added to the download queue")
+
+        # Switch to the downloads tab in the GUI
         self.notebook.select(self.notebook_frames[1])
 
-        # If there are available threads, start the download
+        # If there are available threads, start the download immediately
         if len(self.threads) < self.maximum_simultaneous_downloads.get():
             self.start_download_thread()
 
@@ -276,7 +339,7 @@ class YouTubeDownloaderApp:
 
         # Download Frame: Download button
         tkinter.ttk.Button(self.notebook_frames[0], text="Download",
-                           command=lambda: self.add_dls_to_queue(
+                           command=lambda: self.enque_downloads(
                                download_urls_text_var.get(1.0, "end").strip())).grid(
             column=10, row=0, sticky=(tkinter.E, tkinter.N, tkinter.S))
 
@@ -370,6 +433,13 @@ class YouTubeDownloaderApp:
         else:
             self.root_tk.destroy()
 
+    from urllib.parse import urlparse, parse_qs
+
+    def normalize_to_playlist(self, url: str) -> str:
+        qs = parse_qs(urlparse(url).query)
+        if "list" in qs:
+            return f"https://www.youtube.com/playlist?list={qs['list'][0]}"
+        return url
 
 if __name__ == "__main__":
     try:
