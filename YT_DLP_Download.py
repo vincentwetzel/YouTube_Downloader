@@ -49,7 +49,7 @@ class YT_DLP_Download(QObject):
     def get_video_title(self) -> str:
         try:
             ydl_opts = {"quiet": True, "no_warnings": True, "skip_download": True}
-            with yt_dlp.YT_DLP_Download(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(self.raw_url, download=False)
                 title = info.get("title", "Unknown Title")
                 self.video_title = title
@@ -91,7 +91,7 @@ class YT_DLP_Download(QObject):
 
             # Download
             self.status_updated.emit("Starting download...")
-            with yt_dlp.YT_DLP_Download(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([self.raw_url])
 
             # After download, move file(s) to final destination
@@ -131,5 +131,3 @@ class YT_DLP_Download(QObject):
         # yt-dlp doesn’t have a clean cancel hook, but we can flag it
         self._cancelled = True
         self.status_updated.emit("Cancel requested (will stop after current operation).")
-
-pass

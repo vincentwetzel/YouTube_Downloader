@@ -143,37 +143,56 @@ class MainWindow(QWidget):
     # -----------------------------
     # Tab 1: New Download
     # -----------------------------
-    def _setup_tab_settings(self):
+    def _setup_tab_new(self):
         layout = QVBoxLayout()
 
-        # Output folder
-        self.outdir_label = QLabel("Output folder:")
-        self.outdir_display = QLabel(self.config["Paths"]["completed_downloads_directory"])
-        self.outdir_display.setStyleSheet("border: 1px solid gray; padding: 4px; background-color: #f0f0f0;")
-        self.browse_outdir_btn = QPushButton("📁")
-        self.browse_outdir_btn.setFixedWidth(40)
-        self.browse_outdir_btn.clicked.connect(self.on_browse_outdir)
+        # URL input
+        self.url_label = QLabel("Video/Playlist URL(s):")
+        self.url_input = QTextEdit()
+        self.url_input.setPlaceholderText("Paste one or more URLs here...")
+        self.url_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self.url_input.setFixedHeight(100)
 
-        # Temp folder
-        self.temp_label = QLabel("Temporary folder:")
-        self.temp_display = QLabel(self.config["Paths"]["temporary_downloads_directory"])
-        self.temp_display.setStyleSheet("border: 1px solid gray; padding: 4px; background-color: #f0f0f0;")
-        self.browse_temp_btn = QPushButton("📁")
-        self.browse_temp_btn.setFixedWidth(40)
-        self.browse_temp_btn.clicked.connect(self.on_browse_temp)
+        # Big download button
+        self.download_btn = QPushButton("Download")
+        self.download_btn.setFixedHeight(100)
+        self.download_btn.setMinimumWidth(150)
+        self.download_btn.clicked.connect(self.on_download)
 
-        grid = QGridLayout()
-        grid.addWidget(self.outdir_label, 0, 0)
-        grid.addWidget(self.outdir_display, 0, 1)
-        grid.addWidget(self.browse_outdir_btn, 0, 2)
+        url_row = QHBoxLayout()
+        url_row.addWidget(self.url_input, stretch=1)
+        url_row.addWidget(self.download_btn)
 
-        grid.addWidget(self.temp_label, 1, 0)
-        grid.addWidget(self.temp_display, 1, 1)
-        grid.addWidget(self.browse_temp_btn, 1, 2)
+        # Audio + Max threads (side by side)
+        self.audio_checkbox = QCheckBox("Download audio (mp3)")
+        self.max_threads_label = QLabel("Max simultaneous downloads:")
+        self.max_threads_combo = QComboBox()
+        self.max_threads_combo.addItems(["1", "2", "3", "4"])
+        self.max_threads_combo.setCurrentText(self.config["General"].get("max_threads", "2"))
+        self.max_threads_combo.currentTextChanged.connect(self.on_threads_changed)
 
-        layout.addLayout(grid)
-        layout.addStretch()
-        self.tab_settings.setLayout(layout)
+        options_row = QHBoxLayout()
+        options_row.addWidget(self.audio_checkbox)
+        options_row.addWidget(self.max_threads_label)
+        options_row.addWidget(self.max_threads_combo)
+        options_row.addStretch()
+
+        # Open folder button (bigger)
+        self.open_folder_btn = QPushButton("Open Downloads Folder")
+        self.open_folder_btn.setMinimumHeight(40)
+        self.open_folder_btn.setStyleSheet("font-weight: bold;")
+        self.open_folder_btn.clicked.connect(self.on_open_folder)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(self.open_folder_btn)
+
+        layout.addWidget(self.url_label)
+        layout.addLayout(url_row)
+        layout.addLayout(options_row)
+        layout.addLayout(btn_row)
+
+        self.tab_new.setLayout(layout)
 
     # -----------------------------
     # Tab 2: Active Downloads
@@ -399,6 +418,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-pass
