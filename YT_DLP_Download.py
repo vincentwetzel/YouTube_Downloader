@@ -95,7 +95,14 @@ class YT_DLP_Download(QObject):
                     "home": self.final_destination_dir,  # finished files
                     "temp": self.temp_dl_loc  # .part files
                 },
-                "outtmpl": "%(title).80s [%(uploader|UnknownUploader)s][%(upload_date>%m-%d-%Y)s][%(id)s].%(ext)s"
+                "format": "bestvideo[ext=mp4][vcodec^=avc]+bestaudio[ext=m4a]/best[ext=mp4]",
+                "outtmpl": "%(title).80s [%(uploader|UnknownUploader)s][%(upload_date>%m-%d-%Y)s][%(id)s].%(ext)s",
+                "embed_thumbnail": True,
+                "postprocessors": [
+                    {"key": "EmbedThumbnail"},
+                    {"key": "FFmpegMetadata"}
+                ]
+
             }
 
             if self.download_mp3:
