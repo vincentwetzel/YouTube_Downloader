@@ -1,6 +1,7 @@
 # MediaDownloaderApp.pyw
 # PyQt6 GUI for yt-dlp based downloader
 # Uses YT_DLP_Download.py as backend worker
+import shutil
 import sys
 import os
 import logging
@@ -76,6 +77,95 @@ class UrlTextEdit(QTextEdit):
                 self.setPlainText(txt)
         except Exception:
             pass
+
+def is_browser_installed(browser_key: str) -> bool:
+    """Return True if the given browser (one of yt-dlp supported browsers)
+    appears installed on this machine.  browser_key should be lowercase like:
+    'chrome','chromium','brave','edge','firefox','opera','safari','vivaldi','whale'."""
+    browser_key = (browser_key or "").lower()
+    names = {
+        "chrome": ["chrome", "google-chrome", "chrome.exe"],
+        "chromium": ["chromium", "chromium-browser", "chromium.exe"],
+        "brave": ["brave", "brave-browser", "brave.exe"],
+        "edge": ["msedge", "edge", "msedge.exe"],
+        "firefox": ["firefox", "firefox.exe"],
+        "opera": ["opera", "opera.exe"],
+        "safari": ["Safari.app"],
+        "vivaldi": ["vivaldi", "vivaldi.exe"],
+        "whale": ["whale", "whale.exe"],
+    }
+
+    # quick check with shutil.which
+    if shutil.which(browser_key):
+        return True
+
+    # platform specific path guesses
+    if sys.platform == "win32":
+        win_paths = {
+            "chrome": [
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            ],
+            "chromium": [
+                r"C:\Program Files\Chromium\Application\chrome.exe",
+                r"C:\Program Files (x86)\Chromium\Application\chrome.exe",
+            ],
+            "brave": [
+                r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+                r"C:\Program Files (x86)\BraveSoftware\Brave-Browser\Application\brave.exe",
+            ],
+            "edge": [
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+                r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            ],
+            "firefox": [
+                r"C:\Program Files\Mozilla Firefox\firefox.exe",
+                r"C:\Program Files (x86)\Mozilla Firefox\firefox.exe",
+            ],
+            "opera": [
+                r"C:\Program Files\Opera\launcher.exe",
+                r"C:\Program Files (x86)\Opera\launcher.exe",
+            ],
+            "vivaldi": [
+                r"C:\Program Files\Vivaldi\Application\vivaldi.exe",
+                r"C:\Program Files (x86)\Vivaldi\Application\vivaldi.exe",
+            ],
+            "whale": [
+                r"C:\Program Files\Naver\Naver Whale\Application\whale.exe",
+                r"C:\Program Files (x86)\Naver\Naver Whale\Application\whale.exe",
+            ],
+            "safari": [
+                r"C:\Program Files\Safari\Safari.exe",
+                r"C:\Program Files (x86)\Safari\Safari.exe",
+            ],
+        }
+        paths = win_paths.get(browser_key, [])
+        for p in paths:
+            if p and os.path.exists(p):
+                return True
+
+    if sys.platform == "darwin":
+        mac_map = {
+            "safari": "/Applications/Safari.app",
+            "chrome": "/Applications/Google Chrome.app",
+            "edge": "/Applications/Microsoft Edge.app",
+            "firefox": "/Applications/Firefox.app",
+            "opera": "/Applications/Opera.app",
+            "brave": "/Applications/Brave Browser.app",
+            "vivaldi": "/Applications/Vivaldi.app",
+            "whale": "/Applications/Naver Whale.app",
+            "chromium": "/Applications/Chromium.app",
+        }
+        p = mac_map.get(browser_key)
+        if p and os.path.exists(p):
+            return True
+
+    # fallback to scanning common names with which
+    for candidate in names.get(browser_key, []):
+        if shutil.which(candidate):
+            return True
+
+    return False
 
 
 # ---------- lightweight background workers ----------
@@ -244,7 +334,7 @@ class MediaDownloaderApp(QWidget):
         self.video_quality_combo.currentTextChanged.connect(lambda v: self._save_general("video_quality", v))
 
         self.video_ext_combo = QComboBox()
-        self.video_ext_combo.addItem("default (yt-dlp)", "")
+        self.video_ext_combo.addItem("default", "")
         for ex in ("mp4", "mkv", "webm"):
             self.video_ext_combo.addItem(ex, ex)
         cur_ve = self.config["General"].get("video_ext", "")
@@ -293,7 +383,7 @@ class MediaDownloaderApp(QWidget):
         self.audio_quality_combo.currentIndexChanged.connect(lambda i: self._save_general("audio_quality", self.audio_quality_combo.itemData(i) or "best"))
 
         self.audio_ext_combo = QComboBox()
-        self.audio_ext_combo.addItem("default (yt-dlp)", "")
+        self.audio_ext_combo.addItem("default", "")
         for ex in ("mp3", "m4a", "opus", "aac", "flac"):
             self.audio_ext_combo.addItem(ex, ex)
         curae = self.config["General"].get("audio_ext", "")
@@ -337,7 +427,7 @@ class MediaDownloaderApp(QWidget):
         self.exit_after_cb = QCheckBox("Exit after all downloads complete")
         self.exit_after_cb.stateChanged.connect(lambda s: self._save_general("exit_after", str(bool(s))))
 
-        small.addWidget(QLabel("Playlist:"))
+        small.addWidget(QLabel("Download Full Playlist:"))
         small.addWidget(self.playlist_mode)
         small.addSpacing(12)
         small.addWidget(QLabel("Max concurrent:"))
@@ -396,10 +486,11 @@ class MediaDownloaderApp(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # Output and temp rows on same line
+        paths = self.config["Paths"] if "Paths" in self.config else {}
+
+        # Output row
         out_row = QHBoxLayout()
         out_lbl = QLabel("Output folder:")
-        paths = self.config["Paths"] if "Paths" in self.config else {}
         self.out_display = QLabel(paths.get("completed_downloads_directory", ""))
         self.out_display.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         btn_out = QPushButton("📁")
@@ -410,6 +501,7 @@ class MediaDownloaderApp(QWidget):
         out_row.addWidget(btn_out)
         layout.addLayout(out_row)
 
+        # Temp row
         temp_row = QHBoxLayout()
         temp_lbl = QLabel("Temporary folder:")
         self.temp_display = QLabel(paths.get("temporary_downloads_directory", ""))
@@ -422,10 +514,11 @@ class MediaDownloaderApp(QWidget):
         temp_row.addWidget(btn_temp)
         layout.addLayout(temp_row)
 
-        # SponsorBlock and Restrict filenames + Restore Defaults button
+        # SponsorBlock and Restrict filenames
         self.sponsorblock_cb = QCheckBox("Enable SponsorBlock")
         self.sponsorblock_cb.setChecked(self.config["General"].get("sponsorblock", "True") == "True")
         self.sponsorblock_cb.stateChanged.connect(lambda s: self._save_general("sponsorblock", str(bool(s))))
+
         self.restrict_cb = QCheckBox("Restrict filenames")
         self.restrict_cb.setChecked(self.config["General"].get("restrict_filenames", "False") == "True")
         self.restrict_cb.stateChanged.connect(lambda s: self._save_general("restrict_filenames", str(bool(s))))
@@ -433,6 +526,41 @@ class MediaDownloaderApp(QWidget):
         layout.addWidget(self.sponsorblock_cb)
         layout.addWidget(self.restrict_cb)
 
+        # Cookies chooser (dropdown + file label)
+        cookie_row = QHBoxLayout()
+        cookie_row.addWidget(QLabel("Cookies from browser:"))
+
+        self.cookie_combo = QComboBox()
+        browsers = ["None", "chrome", "chromium", "brave", "edge", "firefox", "opera", "safari", "vivaldi", "whale",
+                    "Choose cookies file..."]
+        # add human-friendly display (capitalize first letter or show 'None')
+        for b in browsers:
+            if b == "None":
+                self.cookie_combo.addItem("None", "None")
+            elif b == "Choose cookies file...":
+                self.cookie_combo.addItem("Choose cookies file...", "file")
+            else:
+                self.cookie_combo.addItem(b.capitalize(), b)
+
+        cur_mode = self.config["General"].get("cookies_mode", "None")
+        cur_file = self.config["General"].get("cookies_file", "")
+        # set index
+        idx = 0
+        for i in range(self.cookie_combo.count()):
+            if self.cookie_combo.itemData(i) == cur_mode:
+                idx = i
+                break
+        self.cookie_combo.setCurrentIndex(idx)
+        self.cookie_combo.currentIndexChanged.connect(self._on_cookie_selection_changed)
+
+        cookie_row.addWidget(self.cookie_combo)
+        # show selected path (if file)
+        self.cookie_file_label = QLabel(cur_file)
+        self.cookie_file_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        cookie_row.addWidget(self.cookie_file_label, stretch=1)
+        layout.addLayout(cookie_row)
+
+        # Restore defaults button (keeps paths)
         restore_btn = QPushButton("Restore Defaults")
         restore_btn.clicked.connect(self._restore_defaults)
         layout.addWidget(restore_btn)
@@ -492,25 +620,44 @@ class MediaDownloaderApp(QWidget):
             os.system(f'xdg-open "{p}"')
 
     def _restore_defaults(self):
-        logger.debug("Restoring defaults")
-        # Reset general settings (but keep paths)
-        keep_paths = dict(self.config.get("Paths", {}))
-        self.config = load_or_create_config()
-        self.config["Paths"] = keep_paths
-        # Persist
-        with open(SETTINGS_FILE, "w") as fh:
-            self.config.write(fh)
-        # Update UI live
-        self.video_quality_combo.setCurrentText(self.config["General"].get("video_quality", "best"))
-        self.video_ext_combo.setCurrentIndex(0)
-        self.vcodec_combo.setCurrentIndex(0)
-        self.audio_quality_combo.setCurrentIndex(0)
-        self.audio_ext_combo.setCurrentIndex(0)
-        self.acodec_combo.setCurrentIndex(0)
-        self.max_threads_combo.setCurrentText(self.config["General"].get("max_threads", "2"))
-        self.sponsorblock_cb.setChecked(self.config["General"].get("sponsorblock", "True") == "True")
-        self.restrict_cb.setChecked(self.config["General"].get("restrict_filenames", "False") == "True")
-        QMessageBox.information(self, "Defaults restored", "Settings were restored to defaults. Paths were preserved.")
+        logger.debug("Restoring defaults (live)")
+        try:
+            # preserve paths (do not overwrite output/temp)
+            keep_paths = dict(self.config.get("Paths", {})) if "Paths" in self.config else {}
+            # rebuild config basing on defaults
+            self.config = load_or_create_config()
+            # restore preserved paths
+            if "Paths" not in self.config:
+                self.config["Paths"] = {}
+            for k, v in keep_paths.items():
+                self.config["Paths"][k] = v
+
+            # persist
+            with open(SETTINGS_FILE, "w") as fh:
+                self.config.write(fh)
+
+            # apply to widgets immediately (do not assume widget existence)
+            try:
+                self.video_quality_combo.setCurrentText(self.config["General"].get("video_quality", "best"))
+                self.video_ext_combo.setCurrentIndex(0)
+                self.vcodec_combo.setCurrentIndex(0)
+                self.audio_quality_combo.setCurrentIndex(0)
+                self.audio_ext_combo.setCurrentIndex(0)
+                self.acodec_combo.setCurrentIndex(0)
+                self.max_threads_combo.setCurrentText(self.config["General"].get("max_threads", "2"))
+                self.sponsorblock_cb.setChecked(self.config["General"].get("sponsorblock", "True") == "True")
+                self.restrict_cb.setChecked(self.config["General"].get("restrict_filenames", "False") == "True")
+                # cookies reset
+                self.cookie_combo.setCurrentIndex(0)
+                self.cookie_file_label.setText(self.config["General"].get("cookies_file", ""))
+            except Exception:
+                logger.exception("Error applying default values to widgets (some widgets may not exist yet)")
+
+            QMessageBox.information(self, "Defaults restored",
+                                    "Settings were restored to defaults. Output/temp paths were preserved.")
+        except Exception as e:
+            logger.exception("Failed to restore defaults: %s", e)
+            QMessageBox.critical(self, "Restore failed", f"Failed to restore defaults: {e}")
 
     # ---------- placeholder creation & UI update helpers ----------
     def _create_placeholder(self, url: str):
@@ -786,27 +933,39 @@ class MediaDownloaderApp(QWidget):
         if not ph:
             logger.debug("No placeholder found to update finished state for %s", url)
             return
+
         try:
             ph["cancel"].hide()
         except Exception:
             pass
+
         if ok:
             ph["progress"].setValue(100)
             ph["right_text"].setText("100%")
+            # green chunk
             ph["progress"].setStyleSheet("QProgressBar::chunk{background-color:#2e7d32;}")
-            ph["title_label"].setText("Completed: " + (ph["title_label"].text() or ph["url"]))
-        else:
-            ph["progress"].setStyleSheet("QProgressBar::chunk{background-color:#c62828;}")
-            ph["title_label"].setText("Failed: " + (ph["title_label"].text() or ph["url"]))
-        # schedule removal after brief pause
-        def remove_later():
+            # show completed title but keep visible
             try:
-                self.scroll_layout.removeWidget(ph["frame"])
-                ph["frame"].deleteLater()
+                # If we have a real title set, leave it; otherwise prefix Completed
+                cur = ph["title_label"].text()
+                if not cur.lower().startswith("completed"):
+                    ph["title_label"].setText("Completed: " + cur)
             except Exception:
                 pass
-            self.active_placeholders.pop(ph["url"], None)
-        QTimer.singleShot(2500, remove_later)
+        else:
+            ph["progress"].setStyleSheet("QProgressBar::chunk{background-color:#c62828;}")
+            try:
+                cur = ph["title_label"].text()
+                if not cur.lower().startswith("failed"):
+                    ph["title_label"].setText("Failed: " + cur)
+            except Exception:
+                pass
+
+        # Mark placeholder as completed so future logic knows it is finished
+        ph["_finished"] = True
+
+        # Do NOT remove the widget. Keep it visible for user's review.
+        # Optionally we could move completed items to the bottom; for now keep them in place.
 
     # ---------- overwrite prompt handler ----------
     def _on_prompt_overwrite(self, url: str, filepath: str):
@@ -843,6 +1002,68 @@ class MediaDownloaderApp(QWidget):
                 ph["frame"].deleteLater()
             except Exception:
                 pass
+
+    def _on_cookie_selection_changed(self, index: int):
+        """Handle cookies dropdown changes safely."""
+        try:
+            data = self.cookie_combo.itemData(index)
+            logger.debug("Cookie selection changed -> %r", data)
+
+            # Safety: ensure label exists
+            if not hasattr(self, "cookie_file_label"):
+                logger.warning("cookie_file_label not initialized yet")
+                return
+
+            if data == "file":
+                # user wants to pick a cookies file
+                path, _ = QFileDialog.getOpenFileName(
+                    self,
+                    "Choose cookies file",
+                    str(Path.home()),
+                    "All files (*)"
+                )
+                if path:
+                    self.cookie_file_label.setText(path)
+                    self._save_general("cookies_mode", "file")
+                    self._save_general("cookies_file", path)
+                else:
+                    # cancel → revert to None
+                    self.cookie_combo.setCurrentIndex(0)
+                    self.cookie_file_label.setText("")
+                    self._save_general("cookies_mode", "None")
+                    self._save_general("cookies_file", "")
+                return
+
+            if not data or data == "None":
+                # user picked "None"
+                self.cookie_file_label.setText("")
+                self._save_general("cookies_mode", "None")
+                self._save_general("cookies_file", "")
+                return
+
+            # user picked a browser → validate installation
+            browser = str(data).lower()
+            if not is_browser_installed(browser):
+                QMessageBox.warning(
+                    self,
+                    "Browser not found",
+                    f"Selected browser '{browser}' does not appear to be installed.\nReverting to None."
+                )
+                self.cookie_combo.setCurrentIndex(0)
+                self.cookie_file_label.setText("")
+                self._save_general("cookies_mode", "None")
+                self._save_general("cookies_file", "")
+                return
+
+            # Browser is valid
+            self._save_general("cookies_mode", browser)
+            self._save_general("cookies_file", "")
+            self.cookie_file_label.setText("")
+
+        except Exception as e:
+            logger.exception("Error handling cookie selection: %s", e)
+            QMessageBox.critical(self, "Cookies error", str(e))
+
 
 # ---------- entry point ----------
 def main():
